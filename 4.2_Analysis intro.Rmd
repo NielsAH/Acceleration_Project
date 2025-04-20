@@ -1,0 +1,319 @@
+### Importing libraries
+We first important the libraries we need.
+
+```{r, message=F, warning=F}
+#Data analysis
+library(tidyverse)
+library(patchwork)
+library(scales)
+library(RColorBrewer)
+
+#Working with the activity class and data files
+library(lubridate)
+library(read.gt3x)
+library(PhysicalActivity)
+
+#Solving equations
+library(nleqslv)
+library(pracma)
+
+#Fast row glueing
+library(data.table)
+```
+
+### Gluing and classification
+
+Here misc. first
+
+```{r}
+seq_silly <- Glue_and_classify(unordered_silly, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+#seq_misc1_1 <- Glue_and_classify(unordered_misc1_1, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+#seq_misc1_2 <- Glue_and_classify(unordered_misc1_2, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_misc2_1 <- Glue_and_classify(unordered_misc2_1, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_misc2_2 <- Glue_and_classify(unordered_misc2_2, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+```
+
+Now walk
+
+```{r}
+seq_walk1 <- Glue_and_classify(unordered_walk_1, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+seq_walk2 <- Glue_and_classify(unordered_walk_2, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+seq_walk3 <- Glue_and_classify(unordered_walk_3, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+seq_walk4 <- Glue_and_classify(unordered_walk_4, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+seq_walk5 <- Glue_and_classify(unordered_walk_5, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+seq_walk6 <- Glue_and_classify(unordered_walk_6, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+seq_walk7 <- Glue_and_classify(unordered_walk_7, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+seq_walk8 <- Glue_and_classify(unordered_walk_8, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+seq_walk9 <- Glue_and_classify(unordered_walk_9, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+seq_walk10 <- Glue_and_classify(unordered_walk_10, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+```
+
+Now the rest
+
+```{r}
+seq_S1_1 <- Glue_and_classify(unordered_S1_1, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S1_2 <- Glue_and_classify(unordered_S1_2, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S1_3 <- Glue_and_classify(unordered_S1_3, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S1_4 <- Glue_and_classify(unordered_S1_4, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S1_5 <- Glue_and_classify(unordered_S1_5, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S1_6 <- Glue_and_classify(unordered_S1_6, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S1_7 <- Glue_and_classify(unordered_S1_7, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+```
+
+```{r}
+seq_S2_1 <- Glue_and_classify(unordered_S2_1, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S2_2 <- Glue_and_classify(unordered_S2_2, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S2_3 <- Glue_and_classify(unordered_S2_3, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S2_4 <- Glue_and_classify(unordered_S2_4, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S2_5 <- Glue_and_classify(unordered_S2_5, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S2_6 <- Glue_and_classify(unordered_S2_6, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S2_7 <- Glue_and_classify(unordered_S2_7, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S2_8 <- Glue_and_classify(unordered_S2_8, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+```
+
+```{r}
+seq_S3_1 <- Glue_and_classify(unordered_S3_1, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S3_2 <- Glue_and_classify(unordered_S3_2, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S3_3 <- Glue_and_classify(unordered_S3_3, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S3_4 <- Glue_and_classify(unordered_S3_4, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S3_5 <- Glue_and_classify(unordered_S3_5, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S3_6 <- Glue_and_classify(unordered_S3_6, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S3_7 <- Glue_and_classify(unordered_S3_7, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+```
+
+```{r}
+seq_S4_1 <- Glue_and_classify(unordered_S4_1, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S4_2 <- Glue_and_classify(unordered_S4_2, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S4_3 <- Glue_and_classify(unordered_S4_3, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S4_4 <- Glue_and_classify(unordered_S4_4, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S4_5 <- Glue_and_classify(unordered_S4_5, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S4_6 <- Glue_and_classify(unordered_S4_6, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S4_7 <- Glue_and_classify(unordered_S4_7, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S4_8 <- Glue_and_classify(unordered_S4_8, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+```
+
+```{r}
+seq_S5_1 <- Glue_and_classify(unordered_S5_1, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S5_2 <- Glue_and_classify(unordered_S5_2, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S5_3 <- Glue_and_classify(unordered_S5_3, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S5_5 <- Glue_and_classify(unordered_S5_5, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S5_6 <- Glue_and_classify(unordered_S5_6, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S5_7 <- Glue_and_classify(unordered_S5_7, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+```
+
+```{r}
+seq_S6_1 <- Glue_and_classify(unordered_S6_1, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S6_2 <- Glue_and_classify(unordered_S6_2, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S6_3 <- Glue_and_classify(unordered_S6_3, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S6_4 <- Glue_and_classify(unordered_S6_4, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S6_5 <- Glue_and_classify(unordered_S6_5, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S6_6 <- Glue_and_classify(unordered_S6_6, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S6_7 <- Glue_and_classify(unordered_S6_7, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+```
+
+```{r}
+seq_S7_1 <- Glue_and_classify(unordered_S7_1, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S7_2 <- Glue_and_classify(unordered_S7_2, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S7_3 <- Glue_and_classify(unordered_S7_3, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S7_4 <- Glue_and_classify(unordered_S7_4, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S7_6 <- Glue_and_classify(unordered_S7_6, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S7_7 <- Glue_and_classify(unordered_S7_7, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S7_8 <- Glue_and_classify(unordered_S7_8, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+```
+
+```{r}
+seq_S8_2 <- Glue_and_classify(unordered_S8_2, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S8_3 <- Glue_and_classify(unordered_S8_3, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S8_4 <- Glue_and_classify(unordered_S8_4, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S8_5 <- Glue_and_classify(unordered_S8_5, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S8_6 <- Glue_and_classify(unordered_S8_6, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S8_7 <- Glue_and_classify(unordered_S8_7, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S8_8 <- Glue_and_classify(unordered_S8_8, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+```
+
+```{r}
+seq_S9_1 <- Glue_and_classify(unordered_S9_1, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S9_2 <- Glue_and_classify(unordered_S9_2, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S9_3 <- Glue_and_classify(unordered_S9_3, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S9_4 <- Glue_and_classify(unordered_S9_4, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S9_5 <- Glue_and_classify(unordered_S9_5, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S9_6 <- Glue_and_classify(unordered_S9_6, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_S9_7 <- Glue_and_classify(unordered_S9_7, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+```
+
+```{r}
+seq_H10_1 <- Glue_and_classify(unordered_H10_1, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H10_2 <- Glue_and_classify(unordered_H10_2, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H10_3 <- Glue_and_classify(unordered_H10_3, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H10_4 <- Glue_and_classify(unordered_H10_4, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H10_5 <- Glue_and_classify(unordered_H10_5, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H10_7 <- Glue_and_classify(unordered_H10_7, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H10_8 <- Glue_and_classify(unordered_H10_8, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+```
+
+```{r}
+seq_H11_1 <- Glue_and_classify(unordered_H11_1, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H11_2 <- Glue_and_classify(unordered_H11_2, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H11_3 <- Glue_and_classify(unordered_H11_3, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H11_4 <- Glue_and_classify(unordered_H11_4, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H11_5 <- Glue_and_classify(unordered_H11_5, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H11_6 <- Glue_and_classify(unordered_H11_6, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H11_7 <- Glue_and_classify(unordered_H11_7, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+```
+
+```{r}
+seq_H12_1 <- Glue_and_classify(unordered_H12_1, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H12_2 <- Glue_and_classify(unordered_H12_2, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H12_3 <- Glue_and_classify(unordered_H12_3, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H12_4 <- Glue_and_classify(unordered_H12_4, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H12_5 <- Glue_and_classify(unordered_H12_5, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H12_6 <- Glue_and_classify(unordered_H12_6, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H12_7 <- Glue_and_classify(unordered_H12_7, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+```
+
+```{r}
+seq_H13_1 <- Glue_and_classify(unordered_H13_1, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H13_2 <- Glue_and_classify(unordered_H13_2, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H13_3 <- Glue_and_classify(unordered_H13_3, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H13_5 <- Glue_and_classify(unordered_H13_5, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H13_6 <- Glue_and_classify(unordered_H13_6, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+```
+
+```{r}
+seq_H14_1 <- Glue_and_classify(unordered_H14_1, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H14_2 <- Glue_and_classify(unordered_H14_2, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H14_3 <- Glue_and_classify(unordered_H14_3, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H14_4 <- Glue_and_classify(unordered_H14_4, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H14_5 <- Glue_and_classify(unordered_H14_5, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H14_6 <- Glue_and_classify(unordered_H14_6, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H14_7 <- Glue_and_classify(unordered_H14_7, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+```
+
+```{r}
+seq_H15_1 <- Glue_and_classify(unordered_H15_1, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H15_2 <- Glue_and_classify(unordered_H15_2, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H15_3 <- Glue_and_classify(unordered_H15_3, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H15_4 <- Glue_and_classify(unordered_H15_4, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H15_5 <- Glue_and_classify(unordered_H15_5, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H15_6 <- Glue_and_classify(unordered_H15_6, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H15_7 <- Glue_and_classify(unordered_H15_7, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+```
+
+```{r}
+seq_H16_1 <- Glue_and_classify(unordered_H16_1, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H16_2 <- Glue_and_classify(unordered_H16_2, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H16_3 <- Glue_and_classify(unordered_H16_3, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H16_4 <- Glue_and_classify(unordered_H16_4, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H16_5 <- Glue_and_classify(unordered_H16_5, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H16_6 <- Glue_and_classify(unordered_H16_6, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H16_7 <- Glue_and_classify(unordered_H16_7, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H16_8 <- Glue_and_classify(unordered_H16_8, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+```
+
+```{r}
+seq_H17_1 <- Glue_and_classify(unordered_H17_1, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H17_2 <- Glue_and_classify(unordered_H17_2, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H17_3 <- Glue_and_classify(unordered_H17_3, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H17_4 <- Glue_and_classify(unordered_H17_4, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H17_5 <- Glue_and_classify(unordered_H17_5, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H17_6 <- Glue_and_classify(unordered_H17_6, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H17_7 <- Glue_and_classify(unordered_H17_7, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H17_8 <- Glue_and_classify(unordered_H17_8, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+```
+
+```{r}
+seq_H18_1 <- Glue_and_classify(unordered_H18_1, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H18_2 <- Glue_and_classify(unordered_H18_2, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H18_3 <- Glue_and_classify(unordered_H18_3, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H18_4 <- Glue_and_classify(unordered_H18_4, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H18_5 <- Glue_and_classify(unordered_H18_5, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H18_6 <- Glue_and_classify(unordered_H18_6, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H18_7 <- Glue_and_classify(unordered_H18_7, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+```
+
+```{r}
+seq_H19_1 <- Glue_and_classify(unordered_H19_1, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H19_2 <- Glue_and_classify(unordered_H19_2, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H19_3 <- Glue_and_classify(unordered_H19_3, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H19_4 <- Glue_and_classify(unordered_H19_4, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H19_5 <- Glue_and_classify(unordered_H19_5, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H19_6 <- Glue_and_classify(unordered_H19_6, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H19_7 <- Glue_and_classify(unordered_H19_7, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_H19_8 <- Glue_and_classify(unordered_H19_8, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+```
+
+```{r}
+seq_A20_1 <- Glue_and_classify(unordered_A20_1, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_A20_2 <- Glue_and_classify(unordered_A20_2, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_A20_3 <- Glue_and_classify(unordered_A20_3, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_A20_4 <- Glue_and_classify(unordered_A20_4, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_A20_5 <- Glue_and_classify(unordered_A20_5, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_A20_6 <- Glue_and_classify(unordered_A20_6, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_A20_7 <- Glue_and_classify(unordered_A20_7, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_A20_8 <- Glue_and_classify(unordered_A20_8, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_A20_9 <- Glue_and_classify(unordered_A20_9, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+```
+
+```{r}
+seq_A21_1 <- Glue_and_classify(unordered_A21_1, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_A21_2 <- Glue_and_classify(unordered_A21_2, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_A21_3 <- Glue_and_classify(unordered_A21_3, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_A21_4 <- Glue_and_classify(unordered_A21_4, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_A21_5 <- Glue_and_classify(unordered_A21_5, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+seq_A21_6 <- Glue_and_classify(unordered_A21_6, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+```
+
+```{r}
+S1_list <- list(seq_S1_1, seq_S1_2, seq_S1_3, seq_S1_4, seq_S1_5, seq_S1_6, seq_S1_7)
+S2_list <- list(seq_S2_1, seq_S2_2, seq_S2_3, seq_S2_4, seq_S2_5, seq_S2_6, seq_S2_7, seq_S2_8)
+S3_list <- list(seq_S3_1, seq_S3_2, seq_S3_3, seq_S3_4, seq_S3_5, seq_S3_6, seq_S3_7)
+S4_list <- list(seq_S4_1, seq_S4_2, seq_S4_3, seq_S4_4, seq_S4_5, seq_S4_6, seq_S4_7, seq_S4_8)
+S5_list <- list(seq_S5_1, seq_S5_2, seq_S5_3, seq_S5_5, seq_S5_6, seq_S5_7)
+S6_list <- list(seq_S6_1, seq_S6_2, seq_S6_3, seq_S6_4, seq_S6_5, seq_S6_6, seq_S6_7)
+S7_list <- list(seq_S7_1, seq_S7_2, seq_S7_3, seq_S7_4, seq_S7_6, seq_S7_7, seq_S7_8)
+S8_list <- list(seq_S8_2, seq_S8_3, seq_S8_4, seq_S8_5, seq_S8_6, seq_S8_7, seq_S8_8)
+S9_list <- list(seq_S9_1, seq_S9_2, seq_S9_3, seq_S9_4, seq_S9_5, seq_S9_6, seq_S9_7)
+H10_list <- list(seq_H10_1, seq_H10_2, seq_H10_3, seq_H10_4, seq_H10_5, seq_H10_7,  seq_H10_8)
+H11_list <- list(seq_H11_1, seq_H11_2, seq_H11_3, seq_H11_4, seq_H11_5, seq_H11_6, seq_H11_7)
+H12_list <- list(seq_H12_1, seq_H12_2, seq_H12_3, seq_H12_4, seq_H12_5, seq_H12_6, seq_H12_7)
+H13_list <- list(seq_H13_1, seq_H13_2, seq_H13_3, seq_H13_5, seq_H13_6)
+H14_list <- list(seq_H14_1, seq_H14_2, seq_H14_3, seq_H14_4, seq_H14_5, seq_H14_6, seq_H14_7)
+H15_list <- list(seq_H15_1, seq_H15_2, seq_H15_3, seq_H15_4, seq_H15_5, seq_H15_6, seq_H15_7)
+H16_list <- list(seq_H16_1, seq_H16_2, seq_H16_3, seq_H16_4, seq_H16_5, seq_H16_6, seq_H16_7, seq_H16_8)
+H17_list <- list(seq_H17_1, seq_H17_2, seq_H17_3, seq_H17_4, seq_H17_5, seq_H17_6, seq_H17_7, seq_H17_8)
+H18_list <- list(seq_H18_1, seq_H18_2, seq_H18_3, seq_H18_4, seq_H18_5, seq_H18_6, seq_H18_7)
+H19_list <- list(seq_H19_1, seq_H19_2, seq_H19_3, seq_H19_4, seq_H19_5, seq_H19_6, seq_H19_7, seq_H19_8)
+
+A20_list <- list(seq_A20_1, seq_A20_2, seq_A20_3, seq_A20_4, seq_A20_5, seq_A20_6, seq_A20_7, seq_A20_8, seq_A20_9)
+A21_list <- list(seq_A21_1, seq_A21_2, seq_A21_3, seq_A21_4, seq_A21_5, seq_A21_6)
+
+walk1_list <- list(seq_walk1)
+walk2_list <- list(seq_walk2)
+walk3_list <- list(seq_walk3)
+walk4_list <- list(seq_walk4)
+walk5_list <- list(seq_walk5)
+walk6_list <- list(seq_walk6)
+walk7_list <- list(seq_walk7)
+walk8_list <- list(seq_walk8)
+walk9_list <- list(seq_walk9)
+walk10_list <- list(seq_walk10)
+```
+
+#Classification
+
+```{r}
+df_analysis <- data.frame(individual = c("S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "H10", "H11", "H12", "H13", "H14", "H15", "H16", "H17", "H18", "H19", "A20", "A21", "walk1", "walk2", "walk3", "walk4", "walk5", "walk6", "walk7", "walk8", "walk9", "walk10"))
+df_analysis$type <- c(rep("S", 9), rep("H", 10), rep("A", 2), rep("walk", 10))
+df_analysis$age <- c(16, 16, 12, 17, 15, 13, 11, 17, 9, 9, 9, 7, 7, 7, 9, 9, 9, 9, 9, 22, 46, 16, 11, 15.75, 12.17, 12.08, 10.33, 8.83, 9.92, 19, 10.5)
+df_analysis$adjusted_age <- ifelse(df_analysis$age >= 20, 20, df_analysis$age)
+
+df_excl_walk <- data.frame(individual = c("S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "H10", "H11", "H12", "H13", "H14", "H15", "H16", "H17", "H18", "H19", "A20", "A21"))
+df_excl_walk$type <- c(rep("S", 9), rep("H", 10), rep("A", 2))
+df_excl_walk$age <- c(16, 16, 12, 17, 15, 13, 11, 17, 9, 9, 9, 7, 7, 7, 9, 9, 9, 9, 9, 22, 46)
+df_excl_walk$adjusted_age <- ifelse(df_excl_walk$age >= 20, 20, df_excl_walk$age)
+```
+
+```{r}
+df_per_day <- data.frame(day = c("S1_1", "S1_2", "S1_3", "S1_4", "S1_5", "S1_6", "S1_7", "S2_1", "S2_2", "S2_3", "S2_4", "S2_5", "S2_6", "S2_7", "S2_8", "S3_1", "S3_2", "S3_3", "S3_4", "S3_5", "S3_6", "S3_7", "S4_1", "S4_2", "S4_3", "S4_4", "S4_5", "S4_6", "S4_7", "S4_8", "S5_1", "S5_2", "S5_3", "S5_5", "S5_6", "S5_7", "S6_1", "S6_2", "S6_3", "S6_4", "S6_5", "S6_6", "S6_7", "S7_1", "S7_2", "S7_3", "S7_4", "S7_6", "S7_7", "S7_8", "S8_2", "S8_3", "S8_4", "S8_5", "S8_6", "S8_7", "S8_8", "S9_1", "S9_2", "S9_3", "S9_4", "S9_5", "S9_6", "S9_7", "H10_1", "H10_2", "H10_3", "H10_4", "H10_5", "H10_7", "H10_8", "H11_1", "H11_2", "H11_3", "H11_4", "H11_5", "H11_6", "H11_7", "H12_1", "H12_2", "H12_3", "H12_4", "H12_5", "H12_6", "H12_7", "H13_1", "H13_2", "H13_3", "H13_5", "H13_6", "H14_1", "H14_2", "H14_3", "H14_4", "H14_5", "H14_6", "H14_7", "H15_1", "H15_2" ,"H15_3", "H15_4", "H15_5", "H15_6", "H15_7", "H16_1", "H16_2", "H16_3", "H16_4", "H16_5", "H16_6", "H16_7", "H16_8", "H17_1", "H17_2", "H17_3", "H17_4", "H17_5", "H17_6", "H17_7", "H17_8", "H18_1", "H18_2", "H18_3", "H18_4", "H18_5", "H18_6", "H18_7", "H19_1", "H19_2", "H19_3", "H19_4", "H19_5", "H19_6", "H19_7", "H19_8", "A20_1", "A20_2", "A20_3", "A20_4", "A20_5", "A20_6", "A20_7", "A20_8", "A20_9", "A21_1", "A21_2", "A21_3", "A21_4", "A21_5", "A21_6"))
+df_per_day$individual <- c(rep("S1", 7), rep("S2", 8), rep("S3", 7), rep("S4", 8), rep("S5", 6), rep("S6", 7), rep("S7", 7), rep("S8", 7), rep("S9", 7), rep("H10", 7) ,rep("H11", 7) ,rep("H12", 7) ,rep("H13", 5) ,rep("H14", 7) ,rep("H15", 7), rep("H16", 8), rep("H17", 8), rep("H18", 7), rep("H19", 8), rep("A20", 9), rep("A21", 6))
+```

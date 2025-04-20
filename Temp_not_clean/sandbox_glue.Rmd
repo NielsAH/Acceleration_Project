@@ -1,0 +1,331 @@
+### Importing libraries
+We first import the libraries we need.
+
+```{r, message=F, warning=F}
+#Data analysis
+library(tidyverse)
+library(patchwork)
+library(scales)
+library(RColorBrewer)
+
+#Working with the activity class and data files
+library(lubridate)
+library(read.gt3x)
+library(PhysicalActivity)
+
+#Solving equations
+library(nleqslv)
+library(pracma)
+```
+
+```{r}
+#sorted_seq <- Glue_and_classify(sequences_A21, 8, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+#If made false, make sure that we do not always want one sequence of sufficient length, or get empty stuff
+sorted_seq <- Glue_and_classify(sequences_walk_1, 3, 3, 300, 150, 300, F, 20, 5, ma_gauss, sigma = 1)
+
+total_movement_length <- 0
+for(j in 1:length(sorted_seq)){
+  if(sorted_seq[[j]]$movement_type == "Walk"){
+    total_movement_length <- total_movement_length + sorted_seq[[j]]$len
+  }
+}
+total_movement_length
+
+for(j in 1:length(sorted_seq)){
+  if(sorted_seq[[j]]$movement_type == "Invalid" & sorted_seq[[j]]$main_freq < 50){
+    print(j)
+    print(sorted_seq[[j]]$data$time[1])
+  }
+}
+
+sorted_seq[[2]]$movement_type
+sorted_seq[[8]]$overarch
+sorted_seq[[165]]$data$time[1]
+sorted_seq[[11]]$main_freq
+sorted_seq[[11]]$len
+spec <- sorted_seq[[455]]$data$acc_fw[32:107] %>% energy_kernel(., 1, ma_trunc)
+spec <- sorted_seq[[11]]$data$acc_fw[85:385] %>% energy_kernel(., 5, ma_gauss, sigma = 1)
+
+#plot(ma_trunc(sorted_seq[[46]]$data$acc_vert[550:663], n = 1), type = 'l') 
+#plot(ma_trunc(sorted_seq[[11]]$data$acc_vert[360:660], n = 1), type = 'l') 
+
+plot(spec, type = 'h')
+capture_hills(spec, 5)[[2]][[2]]
+```
+
+Investigation into Martin data / weird rotation:
+
+```{r}
+sorted_seq[[1]]$data$acc_side[100:200] %>% plot(type = 'l')
+df_A21[66679:66779,]$Z %>% plot(type = 'l')
+
+sorted_seq[[2]]$data$acc_fw[100:200] %>% plot(type = 'l')
+df_A21[70854:70954,]$X %>% plot(type = 'l')
+```
+
+Given a list of sequences, we first add the length of every sequence to the available information.
+
+```{r}
+seq <- sequences_A20_2
+
+seq <- lapply(seq, function(new_seq){
+  new_seq$len <- nrow(new_seq$data)
+  return(new_seq)
+})
+```
+
+We now sort it to get them in order
+
+```{r}
+sorted_seq <- seq[order(sapply(seq, function(x) x$data$time[1]))]
+
+#sorted_seq[[1]]$data$time[2] - sorted_seq[[1]]$data$time[1]
+#(sorted_seq[[1]]$data$time[2] - sorted_seq[[1]]$data$time[1] > 0.04)
+time_thresh <- 8 #Glue if within this parameter, in seconds...
+freq_thresh <- 3 #... and within this parameter for frequency (mostly run vs walk)
+
+overarch <- numeric(length(sorted_seq))
+num <- 1
+
+overarch[1] <- num
+
+for(j in 2:length(sorted_seq)){
+  
+  #If too much time between them, we always get a new sequence
+  
+  time_diff <- (sorted_seq[[j]]$data$time[1] - tail(sorted_seq[[j-1]]$data$time, 1))
+  if(as.numeric(time_diff, units = "secs") > time_thresh){
+    num <- num + 1
+  } #We can also get a new sequence if different frequency: often when going from running to walking or vice versa
+  else if(abs(sorted_seq[[j]]$main_freq - sorted_seq[[j-1]]$main_freq) > freq_thresh){
+    num <- num + 1 
+  }
+  overarch[j] <- num
+}
+
+#Now still checking times to see if we did this logically
+overarch
+#...
+```
+
+Now we do something with the lengths: it needs to be part of an overarching movement of at least 10 seconds, for example. We can then use the remaining movements and lengths to see a new distribution in both frequencies and total time in movement, to see if more clearly two peaks, for example
+
+```{r}
+#e.g. num = 10
+for(num in 1:max(overarch)){
+  total <- 0
+  idc_num <- which(overarch == num)
+  
+  print("New info:")
+  print(num)
+  print(sorted_seq[[idc_num[1]]]$data$time[1])
+  print(tail(sorted_seq[[idc_num[length(idc_num)]]]$data, 1)$time)
+  
+  for(j in idc_num){
+    total <- total + sorted_seq[[j]]$len
+    print(sorted_seq[[j]]$main_freq)
+    print(sorted_seq[[j]]$class)
+    spec <- sorted_seq[[j]]$data$acc_side %>% energy_kernel(., 5, ma_gauss, sigma = 1)
+    print((length(spec)*2 + 1)/which.max(spec))
+  }
+  }
+```
+
+We will see if we can indeed distinguish walking and cycling (the classes within walking are too difficult for now, e.g. stair walking). 
+
+```{r}
+sorted_seq[[40]]$data$acc_side %>% abs() %>% mean()
+plot(sorted_seq[[40]]$data$acc_side, type = 'l')
+
+spec <- sorted_seq[[1]]$data$acc_fw[300:500] %>% energy_kernel(., 5, ma_gauss, sigma = 1)
+(length(spec)*2 + 1)/which.max(spec)
+plot(spec, type = 'l')
+
+(capture_hills(spec, 2)[[2]][[1]] + capture_hills(spec, 2)[[2]][[2]])/2
+capture_hills(spec, 2)[[2]][[1]] 
+capture_hills(spec, 2)[[2]][[2]] 
+
+start_time <- as.POSIXct("2024-10-10 07:55:00.000")
+end_time <- as.POSIXct("2024-10-10 08:00:00.000")
+df <- filter(A20_off, time > start_time & time < end_time)
+
+df_new <- Big_window_manipulation(df, wdw_size, ma_data, ma_energy, upright_thresh, thresh_abs, ma_gauss, sigma = std_dev)
+view(df_new)
+plot(df_new[5970:6170,]$acc_fw, type = 'l')
+
+plot(A20_off[213000:213200,2], type = 'l')
+```
+
+Now we actually do so
+
+```{r}
+valid_overarch <- c()
+
+for(num in 1:max(overarch)){
+  total <- 0
+  highest <- 0
+  idc_num <- which(overarch == num)
+  
+  for(j in idc_num){
+    total <- total + sorted_seq[[j]]$len
+    highest <- max(highest, sorted_seq[[j]]$len)
+  }
+  
+  print(num)
+  print(highest)
+  
+  #At least one movement sequence of certain size to classify. Add param for size!
+  if((total > 300) & (highest > 300)){
+    valid_overarch <- append(valid_overarch, num)
+  }
+}
+
+for(num in unique(valid_overarch)){
+  
+  freq_avg <- c()
+  idc_num <- which(overarch == num)
+  
+  for(j in idc_num){
+    if(sorted_seq[[j]]$len > 300){
+      
+      middle_idx <- (sorted_seq[[j]]$len %/% 2) + 1
+      start_idx <- middle_idx - 150
+      end_idx <- middle_idx + 150
+      
+      spec <- sorted_seq[[j]]$data$acc_fw[start_idx:end_idx] %>% energy_kernel(., 5, ma_gauss, sigma = 1)
+      main_freq_avg <- (capture_hills(spec, 2)[[2]][[1]] + capture_hills(spec, 2)[[2]][[2]])/2
+      freq_avg <- append(freq_avg, (main_freq_avg > sorted_seq[[j]]$main_freq))
+    }
+  }
+  
+  if(all(freq_avg)){
+    print(num)
+    print("Cycle")
+  }
+  else if(all(!freq_avg)){
+    print(num)
+    print("Walk/run")
+  }
+  else{
+    print(num)
+    print("Mixed?!")
+  }
+  
+    
+  #all(c(1,2,3) > 0.9)
+
+}
+```
+
+
+
+
+### Distribution of frequencies per dataframe
+
+```{r}
+temp_seq <- sequences_H12
+frequencies <- c()
+forward_avg <- c()
+for(idx in 1:length(temp_seq)){
+  frequencies <- append(frequencies, temp_seq[[idx]]$main_freq)
+  forward_avg <- append(forward_avg, temp_seq[[idx]]$data$acc_fw %>% abs() %>% mean())
+}
+temp <- data.frame(freq = frequencies, fw_avg = forward_avg)
+ggplot(temp, aes(x = freq)) +
+  geom_histogram(binwidth = 0.5, fill = "blue", color = "black", alpha = 0.7) +
+  theme_minimal()
+ggplot(temp, aes(x = fw_avg)) +
+  geom_histogram(binwidth = 0.01, fill = "blue", color = "black", alpha = 0.7) +
+  theme_minimal()
+
+which.max(forward_avg)
+```
+
+For A20_2 test how we can distinguish the three main types of movement. I guess for running/walking the ''type/speed of walking'' just mostly determined by this main frequency. So only compare ones at same frequency probably (although that has problem if standard walking speed still bit different for both). Remove this one
+
+```{r}
+for(idx in 1:length(temp_seq)){
+  temp_seq[[idx]]$data$time[1] %>% print()
+}
+
+temp_seq[[1]]$main_freq
+temp_seq[[15]]$data$acc_fw %>% plot(., type = 'l')
+temp_seq[[21]]$data$acc_fw %>% abs() %>% mean()
+```
+
+### Test: energy per direction
+Note: the idea relies on exerted force, not energy. Energy expenditure does not have to grow linear with force I would assume. 
+
+Firstly, we assume that we have a single step. Extract some examples purely for testing.
+
+```{r}
+
+plot(sequences_S1[[1]]$data$acc_vert[50:150], type = 'l')
+plot(sequences_H10[[185]]$data$acc_vert[50:150], type = 'l')
+plot(sequences_A20_2[[21]]$data$acc_vert[50:150], type = 'l')
+
+test_step_1H <- filter(sequences_H10[[185]]$data, in_step_fw == 1)
+test_step_2H <- filter(sequences_H10[[185]]$data, in_step_bw == 1)
+
+test_step_1A <- filter(sequences_A20_2[[21]]$data, in_step_fw == 1)
+test_step_2A<- filter(sequences_A20_2[[21]]$data, in_step_bw == 1)
+
+test_step_1S <- filter(sequences_S1[[1]]$data, in_step_fw == 1)
+test_step_2S <- filter(sequences_S1[[1]]$data, in_step_bw == 1)
+```
+
+```{r}
+test_step <- test_step_2H
+
+(force_vert <- sum(abs(test_step$acc_vert)))
+(force_fw <- sum(abs(test_step$acc_fw)))
+(force_side <- sum(abs(test_step$acc_side)))
+(force_wasted <- (force_vert + force_side) / (force_vert + force_fw + force_side))
+(force_side) / (force_vert + force_fw + force_side)
+```
+
+We test if across whole sequence also the case
+
+```{r}
+seq <- sequences_A20_2[[21]]$data
+seq <- sequences_H10[[185]]$data
+seq <- sequences_S1[[1]]$data
+
+steps_fw <- max(seq$in_step_fw)
+steps_bw <- max(seq$in_step_bw)
+
+step_data_wasted <- c()
+step_data_wasted_side <- c()
+
+for(i in 1:steps_fw){
+  step <- filter(seq, in_step_fw == i)
+  
+  force_vert <- sum(abs(step$acc_vert))
+  force_fw <- sum(abs(step$acc_fw))
+  force_side <- sum(abs(step$acc_side))
+  force_wasted <- (force_vert + force_side) / (force_vert + force_fw + force_side)
+  force_wasted_side <- (force_side) / (force_vert + force_fw + force_side)
+  
+  step_data_wasted <- append(step_data_wasted, force_wasted)
+  step_data_wasted_side <- append(step_data_wasted_side, force_wasted_side)
+}
+for(j in 1:steps_bw){
+  step <- filter(seq, in_step_bw == j)
+  
+  force_vert <- sum(abs(step$acc_vert))
+  force_fw <- sum(abs(step$acc_fw))
+  force_side <- sum(abs(step$acc_side))
+  force_wasted <- (force_vert + force_side) / (force_vert + force_fw + force_side)
+  force_wasted_side <- (force_side) / (force_vert + force_fw + force_side)
+  
+  step_data_wasted <- append(step_data_wasted, force_wasted)
+  step_data_wasted_side <- append(step_data_wasted_side, force_wasted_side)
+}
+
+step_data_wasted %>% min()
+step_data_wasted %>% max()
+step_data_wasted_side %>% min()
+step_data_wasted_side %>% max()
+```
+
+Now try to generalise. Write a function that finds distribution and mean values per sequence, and also for a whole dataframe

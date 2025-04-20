@@ -1,0 +1,225 @@
+### Importing libraries
+We first important the libraries we need.
+
+```{r, message=F, warning=F}
+#Data analysis
+library(tidyverse)
+library(patchwork)
+library(scales)
+library(RColorBrewer)
+
+#Working with the activity class and data files
+library(lubridate)
+library(read.gt3x)
+library(PhysicalActivity)
+
+#Solving equations
+library(nleqslv)
+library(pracma)
+library(latex2exp)
+
+#Reshaping / data manipulation
+library(reshape2)
+library(data.table)
+
+##gganimate
+library(gganimate)
+library(glue)
+```
+
+```{r}
+n <- 250
+
+element <- "A20"
+all <- list()
+for(item in get(paste0(element, "_list"))){
+  all <- append(all, item)
+}
+element <- "A21"
+all <- list()
+for(item in get(paste0(element, "_list"))){
+  all <- append(all, item)
+}
+
+#Run only
+all <- list(A20_list[[3]][[2]])
+#Smaller dataframe to test mvm and overarch
+all <- A20_list[[1]]
+
+dataframes <- df_all_from_mvm_alt(all, n, min_square_difference_vert, freq_selector, c(5,25))
+dataframes <- df_all_from_mvm_alt(all, n, min_square_difference_vert, freq_selector, c(14,21))
+
+df1 <- dataframes[[1]] 
+df2 <- dataframes[[2]]
+df3 <- dataframes[[3]]
+step_data <- dataframes[[4]]
+
+colnames(df1) <- as.character(1:n)
+colnames(df2) <- as.character(1:n)
+colnames(df3) <- as.character(1:n)
+```
+
+```{r}
+df_temp <- df2
+
+#MA code: works only when removing overarch
+# for(j in 1:250){
+#   df_temp[[j]] <- ma_trunc(df_temp[[j]], n = 10)
+# }
+
+df_temp$id <- 1:nrow(df_temp)
+df_temp$mvm <- step_data$mvm
+df_temp$overarch <- step_data$overarch
+
+df_long <- df_temp %>%
+  pivot_longer(cols = -c(id, mvm, overarch), names_to = "time", values_to = "value") %>%
+  mutate(time = as.numeric(gsub("V", "", time)))
+
+ggplot(df_long, aes(x = time, y = value, group = id, color = mvm)) +
+  geom_line() +
+  theme_minimal() +
+  labs(title = "Time Series per Observation", x = "time", y = "value")
+
+ggplot(df_long %>% filter(id == 800), aes(x = time, y = value, group = id, color = mvm)) +
+  geom_line() +
+  theme_minimal() +
+  labs(title = "Time Series per Observation", x = "Time", y = "Value")
+```
+
+Simple animation
+
+```{r}
+df_long2 <- df_long %>% 
+  filter(id < 7000) %>%  #Just for a quick test 
+  mutate(frame = id)
+
+df_long2_prev <- df_long2 %>%
+  mutate(frame = frame + 1)
+
+df_long_anim <- bind_rows(df_long2 %>% mutate(color = 0), 
+                          df_long2_prev %>% mutate(color = 1)) %>%
+                          arrange(id, color, time)
+
+p <- ggplot(df_long_anim, aes(x = time, y = value, group = id, color = factor(color))) +
+  geom_line(linewidth = 1) +
+  scale_color_manual(values = c("0" = "black", "1" = "red")) +
+  theme_minimal() +
+  labs(title = "Animating ID Transitions", x = "Time", y = "Value") +
+  transition_states(frame, transition_length = 0, state_length = 1) +
+  ease_aes("linear")
+
+animate(p, renderer = av_renderer("my_animation.mp4"), fps = 1)
+#anim_save("animation.mp4", animation = p, fps = 1)
+```
+
+Trying to make animation more complicated
+
+```{r}
+df_long_anim$lag_start <- ifelse(df_long_anim$time == 1 & df_long_anim$color ==  1, 1, 0)
+df_long_anim <- df_long_anim %>%
+  mutate(remove_starts = if_else(lag_start == 1 & id != max(id) & overarch != lead(overarch, n = n), 1, 0))
+
+update_vector <- function(v, n) {
+  new_vec <- v
+  for (i in seq_along(v)) {
+    if (!is.na(v[i]) && v[i] == 1) {
+      # Set the current and the next 249 values to 1
+      new_vec[i:min(i - 1 + n, length(v))] <- 1
+    }
+  }
+  return(new_vec)
+}
+
+#Remove all red lines at the start of an overarch
+df_long_anim$remove <- update_vector(df_long_anim$remove_starts, n)
+
+df_clean_anim <- df_long_anim %>% filter(remove == 0)
+df_clean_anim <- df_clean_anim[1:(nrow(df_clean_anim) - n), ]
+
+view(df_clean_anim)
+
+p <- ggplot(df_clean_anim, aes(x = time, y = value, group = id, color = factor(color), alpha = factor(color))) +
+  geom_line(linewidth = 1.5) +
+  scale_color_manual(values = c("0" = "black", "1" = "black")) +
+  scale_alpha_manual(values = c("0" = 1, "1" = 0.4)) +
+  theme_minimal() +
+  labs(title = 'Step number: {closest_state}', 
+       x = "Step phase / index", 
+       y = "Acceleration in g") +
+  transition_states(frame, transition_length = 0, state_length = 2) +
+  ease_aes("linear") +
+  #ylim(-1, 0.8) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  ) +
+  guides(color = "none", alpha = "none")
+
+#animate(p, renderer = av_renderer("my_animation.mp4"), fps = 1, width = 2000, height = 800)
+anim_save("temp_vert.mp4", animation = p, fps = 1, width = 2000, height = 800, nframes = max(df_clean_anim$frame))
+anim_save("run_A20_ma1_vert.mp4", animation = p, fps = 1, width = 2000, height = 800, nframes = max(df_clean_anim$frame))
+view(df_clean_anim)
+```
+
+Seeing if I really get how the animation works
+
+```{r}
+df_temp_anim <- data.frame(matrix(nrow = 1250, ncol = 10))
+df_temp_anim$id <- c(rep(1, 500), rep(2, 500), rep(3, 250))
+df_temp_anim$mvm <- c(rep(1, 500), rep(2, 500), rep(3, 250))
+df_temp_anim$overarch <- c(rep(1, 500), rep(2, 750))
+df_temp_anim$time <- c(1:250, 1:250, 1:250, 1:250, 1:250)
+df_temp_anim$frame <- c(rep(1, 250), rep(2, 500), rep(3, 500))
+df_temp_anim$color <- c(rep(0, 250), rep(1,250), rep(0,250), rep(1,250), rep(0, 250))
+df_temp_anim$remove_starts <- rep(0,1250)
+df_temp_anim$lag_start <- rep(0,1250)
+df_temp_anim$remove <- rep(0,1250)
+df_temp_anim$value <- c(rep(1,500), rep(2, 500), rep(3,250))
+
+view(df_temp_anim)
+
+p <- ggplot(df_temp_anim, aes(x = time, y = value, group = id, color = factor(color), alpha = factor(color))) +
+  geom_line(linewidth = 1.5) +
+  scale_color_manual(values = c("0" = "black", "1" = "red")) +
+  scale_alpha_manual(values = c("0" = 1, "1" = 0.4)) +
+  theme_minimal() +
+  labs(title = 'Test: {closest_state}', 
+       x = "Time", 
+       y = "Value") +
+  transition_states(frame, transition_length = 0, state_length = 1) +
+  ease_aes("linear") +
+  ylim(0, 5) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  ) +
+  guides(color = "none", alpha = "none")
+
+anim_save("animation.mp4", animation = p, fps = 1, width = 2000, height = 800)
+```
+
+Just general plotting of one line
+```{r}
+ggplot() +
+  geom_line(data = df_temp, aes(x = time, y = Step1), colour = "#D62728", linewidth = 0.8)  +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )')
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+```

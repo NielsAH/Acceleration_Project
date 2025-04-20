@@ -1,0 +1,655 @@
+### Importing libraries
+We first important the libraries we need.
+
+```{r, message=F, warning=F}
+#Data analysis
+library(tidyverse)
+library(latex2exp)
+library(patchwork)
+library(scales)
+library(RColorBrewer)
+
+#Working with the activity class and data files
+library(lubridate)
+library(read.gt3x)
+library(PhysicalActivity)
+
+#Solving equations
+library(nleqslv)
+library(pracma)
+library(latex2exp)
+
+#Reshaping / data manipulation
+library(reshape2)
+library(data.table)
+
+##gganimate/creating animations
+library(gganimate)
+library(glue)
+library(shiny)
+library(av)
+library(magick)
+```
+
+We first attempt it for very general data. Not just for our steps. In essence, we simply try to display one vector and slowly show more of it.
+
+```{r}
+temp <- A20_off[900000:900100,]
+width <- 15   #Display 11 values at the same time
+half_width <- (width - 1)/2
+frame_tot <- nrow(temp) + 1 - width
+
+frame_list <- c()
+for(j in 1:frame_tot){
+  frame_list <- append(frame_list, rep(j, width))
+}
+
+idx_list <- c()
+for(j in 1:frame_tot){
+  idx_list <- append(idx_list, temp$time[j:(j + width - 1)])
+}
+
+val_list <- c()
+for(j in 1:frame_tot){
+  val_list <- append(val_list, temp$Y[ j:(j + width - 1)])
+}
+
+colour_list <- c()
+for(j in 1:frame_tot){
+  colour_list <- append(colour_list, c(rep(0, half_width), 1, rep(0, half_width)))
+}
+
+new <- data.frame(frame = frame_list, idx = idx_list, value = val_list, colour = colour_list)
+
+p <- ggplot(new, aes(x = idx, y = value)) +
+  geom_line() +
+  geom_point(aes(color = factor(colour), size = factor(colour))) +
+  scale_colour_manual(values = c("0" = "black", "1" = "red")) +
+  scale_size_manual(values = c("0" = 5, "1" = 15)) +
+  transition_states(frame, transition_length = 0, state_length = 1) +
+  view_follow(fixed_y = T)
+
+anim_save("temp.mp4", animation = p, fps = 1, width = 2000, height = 800, nframes = frame_tot)
+
+# Plot
+# p <- ggplot(new, aes(x = idx, y = value, color = factor(colour))) +
+#   geom_line(linewidth = 1.5) +
+#   scale_color_manual(values = c("0" = "black", "1" = "red")) +
+#   theme_minimal() +
+#   labs(title = 'Test: {closest_state}', 
+#        x = "Time", 
+#        y = "Value") +
+#   transition_states(frame, transition_length = 0, state_length = 1) +
+#   ease_aes("linear") +
+#   ylim(0, 5) +
+#   theme_minimal() +
+#   theme(
+#     text = element_text(size = 14),            
+#     axis.title = element_text(size = 14),      
+#     axis.text = element_text(size = 14),       
+#     legend.text = element_text(size = 14),     
+#     legend.title = element_text(size = 14)     
+#   ) +
+#   guides(color = "none", alpha = "none")
+```
+
+What if we instead had to make such an animation from the list data which has individual sequences and steps? This also means between steps there can be gaps of nothing. 
+
+```{r}
+all <- list(A20_list[[1]][[2]], A20_list[[1]][[3]], A20_list[[1]][[4]])
+temp <- data.frame()
+mvm_num <- 0
+for(j in all){
+  mvm_num <- mvm_num + 1
+  mvm_df <- j$data %>% mutate(mvm = mvm_num, overarch = j$overarch)
+  temp <- rbind(temp, mvm_df)
+}
+temp <- temp %>% select(time, acc_fw, acc_vert, acc_side, in_step_bw, in_step_fw, mvm)
+temp$time <- as.numeric(temp$time)
+last_mvm <- max(temp$mvm)
+if(last_mvm > 1){
+ for(j in 1:(last_mvm - 1)){
+   insert_after <- max(which(temp$mvm == j))
+   time_before <- temp$time[insert_after]
+   time_after <- temp$time[insert_after + 1]
+   row_number <- round((time_after - time_before)*30) - 1
+   for(k in 1:row_number){
+     temp <- temp %>% add_row(time = time_before + (1/30)*k, acc_fw = 0, acc_vert = 0, acc_side = 0, in_step_bw = 0, in_step_fw = 0, mvm = 0, .after = insert_after - 1 + k)
+   }
+ } 
+}
+```
+
+We can now make a video using this new dataframe
+
+```{r}
+width <- 15 
+half_width <- (width - 1)/2
+frame_tot <- nrow(temp) + 1 - width
+
+frame_list <- c()
+for(j in 1:frame_tot){
+  frame_list <- append(frame_list, rep(j, width))
+}
+
+idx_list <- c()
+for(j in 1:frame_tot){
+  idx_list <- append(idx_list, temp$time[j:(j + width - 1)])
+}
+
+val_list <- c()
+for(j in 1:frame_tot){
+  val_list <- append(val_list, temp$acc_vert[ j:(j + width - 1)])
+}
+
+colour_function <- function(df, idx){
+  if((df$in_step_bw[idx] == 0) & (df$in_step_fw[idx] == 0)){
+    return(2)
+  }
+  else if((df$in_step_bw[idx] %% 2 == 1) | (df$in_step_fw[idx] %% 2 == 1)){
+    return(3)
+  }
+  else{
+    return(4)
+  }
+}
+
+colour_function_test <- function(df, idx){
+  if((df$mvm[idx] == 0)){
+    return(2)
+  }
+  else if((df$mvm[idx] %% 2 == 1)){
+    return(3)
+  }
+  else{
+    return(4)
+  }
+}
+
+# colour_list <- c()
+# for(j in 1:frame_tot){
+#   colour_list <- append(colour_list, c(rep(0, half_width), 1, rep(0, half_width)))
+# }
+
+alt_colour_list <- c()
+for(j in 1:frame_tot){
+  for(k in 1:half_width){
+    alt_colour_list <- append(alt_colour_list, colour_function(temp, j - 1 + k))
+  }
+  alt_colour_list <- append(alt_colour_list, 1)
+  for(k in 1:half_width){
+    alt_colour_list <- append(alt_colour_list, colour_function(temp, j + half_width + k))
+  }
+}
+
+#new <- data.frame(frame = frame_list, idx = idx_list, value = val_list, colour = colour_list)
+new <- data.frame(frame = frame_list, idx = idx_list, value = val_list, colour = alt_colour_list)
+
+p <- ggplot(new, aes(x = idx, y = value)) +
+  geom_line() +
+  geom_point(aes(color = factor(colour), size = factor(colour))) +
+  scale_colour_manual(values = c("0" = "red", "1" = "black", "2" = "#984EA3", "3" = "#009E73", "4" = "#E69F00")) +
+  scale_size_manual(values = c("0" = 5, "1" = 15, "2" = 5, "3" = 5, "4" = 5)) +
+  transition_states(frame, transition_length = 0, state_length = 1) +
+  view_follow(fixed_y = T)
+
+anim_save("temp_new.mp4", animation = p, fps = 1, width = 2000, height = 800, nframes = frame_tot)
+```
+
+```{r}
+animate(p, renderer = file_renderer(dir = "frames", prefix = "frame_", overwrite = TRUE), fps = 1, width = 800, height = 320, nframes = frame_tot)
+
+ui <- fluidPage(
+  titlePanel("Frame Viewer"),
+  # Move slider and buttons above images
+  sliderInput("frame", "Frame:", min = 1, max = frame_tot, value = 1, step = 1),
+  fluidRow(
+    column(10,
+           actionButton("prev", "Previous"),
+           actionButton("next", "Next"),
+           actionButton("play_pause", "Play"),
+           numericInput("delay", "Delay (s):", value = 1/30, min = 0, step = 1/90, width = "100px")
+    )
+  ),
+  # Show both images side by side
+  fluidRow(
+    column(4, imageOutput("frame_img", width = "10%", height = "10px")),
+    column(4, imageOutput("video_img", width = "10%", height = "10px"))
+  )
+)
+
+server <- function(input, output, session) {
+  frame_dir <- "frames"
+  frame_video_dir <- "frames_video"
+  
+  frame_files <- list.files(frame_dir, pattern = "\\.jpg$", full.names = TRUE)
+  frame_files <- sort(frame_files)
+  
+  video_files <- list.files(frame_video_dir, pattern = "\\.jpg$", full.names = TRUE)
+  video_files <- sort(video_files)
+
+  observe({
+    updateSliderInput(session, "frame", max = length(frame_files))
+  })
+
+  observeEvent(input$`next`, {
+    new_val <- min(input$frame + 1, length(frame_files))
+    updateSliderInput(session, "frame", value = new_val)
+  })
+
+  observeEvent(input$prev, {
+    new_val <- max(input$frame - 1, 1)
+    updateSliderInput(session, "frame", value = new_val)
+  })
+
+  output$frame_img <- renderImage({
+    list(src = frame_files[input$frame], contentType = 'image/jpg')
+  }, deleteFile = FALSE)
+
+
+  output$video_img <- renderImage({
+    list(src = video_files[input$frame], contentType = 'image/jpg')
+  }, deleteFile = FALSE)
+  
+  playing <- reactiveVal(FALSE)
+
+  observeEvent(input$play_pause, {
+    playing(!playing())
+    updateActionButton(session, "play_pause", label = if (playing()) "Pause" else "Play")
+    })
+  # Timer to auto-advance frames
+  observe({
+    if (playing()) {
+      new_val <- if (input$frame < frame_tot) input$frame + 1 else 1
+      updateSliderInput(session, "frame", value = new_val)
+      Sys.sleep(input$delay)
+      }
+    })
+}
+
+shinyApp(ui = ui, server = server)
+```
+
+We now test this for walking data in combination with 
+
+```{r}
+system("ffmpeg -i test_walk_MP4.mp4 -q:v 3 -vf \"fps=30,scale = 500:400\" frames_video/frame_%05d.jpg")
+width <- 15
+
+#Now just need the corresponding frames of , so exact right start and end time and then analyse it
+#Firstly we guess the time
+vid_frames <- length(list.files("frames_videos", pattern = "\\.jpg")) #frames_videos should still depend on the precise folder we are asking from. Should be variable in a function.
+start_time <- as.POSIXct("2025-01-20 10:31:19.630")
+end_time <- start_time - (1/30) + vid_frames/30 + (width - 1)*(1/30) 
+
+#Has actually one fewer observvation than you would maybe want that gets added later. Look into this still
+temp_df <- filter(df_walk_1, time >= start_time & time <= end_time) 
+```
+
+```{r}
+wdw_size <- 150
+ma_data <- 5
+ma_energy <- 9
+kernel_func <- ma_gauss 
+std_dev <- 1
+upright_thresh <- 0.75
+abs_acc_thresh <- 0.1 #Can be both peak and valley. ``Sufficient acceleration''
+#Do not want footsteps to be from peak to valley or from valley to peak though!!!
+thresh_abs <- 0.005 
+thresh_rel <- 0.33 
+min_step_period <- 5
+max_step_period <- 40
+period_len <- 5 
+period_len_double <- 1
+period_thresh <- 0.18
+double_step_thresh <- 0.27
+thresh_direction <- 0.3
+
+unordered_alt_walk_1 <- fast_extraction_algorithm(df_walk_1, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+
+unordered_seq <- unordered_alt_walk_1
+
+ordered_seq <- unordered_seq[order(sapply(unordered_seq, function(x) x$data$time[1]))]
+```
+
+```{r}
+temp <- data.frame()
+mvm_num <- 0
+for(j in ordered_seq){
+  mvm_num <- mvm_num + 1
+  mvm_df <- j$data %>% mutate(mvm = mvm_num, overarch = j$overarch)
+  temp <- rbind(temp, mvm_df)
+}
+temp <- temp %>% select(time, acc_fw, acc_vert, acc_side, in_step_bw, in_step_fw, mvm)
+temp$time <- as.numeric(temp$time)
+last_mvm <- max(temp$mvm)
+
+#We now add blank space between the movements, if necessary
+if(last_mvm > 1){
+ for(j in 1:(last_mvm - 1)){
+   insert_after <- max(which(temp$mvm == j))
+   time_before <- temp$time[insert_after]
+   time_after <- temp$time[insert_after + 1]
+   row_number <- round((time_after - time_before)*30) - 1
+   for(k in 1:row_number){
+     temp <- temp %>% add_row(time = time_before + (1/30)*k, acc_fw = 0, acc_vert = 0, acc_side = 0, in_step_bw = 0, in_step_fw = 0, mvm = 0, .after = insert_after - 1 + k)
+   }
+ } 
+}
+
+#We now add blank space before the first and after the last movement to match video length
+insert_before <- 1
+time_before <- as.numeric(start_time) - 1/30 #The first we add is the first immediately after start_time
+time_after <- temp$time[1]
+row_number <- round((time_after - time_before)*30) - 1
+row_number <- round((time_after - time_before)*30) - 1
+   for(k in 1:row_number){
+     temp <- temp %>% add_row(time = time_after - (1/30)*k, acc_fw = 0, acc_vert = 0, acc_side = 0, in_step_bw = 0, in_step_fw = 0, mvm = 0, .before = insert_before)
+   }
+
+#We now add a blank space after the last movement to match video length
+insert_after <- nrow(temp)
+time_before <- temp$time[nrow(temp)] 
+time_after <- as.numeric(end_time) + 1/30
+row_number <- round((time_after - time_before)*30) - 1
+   for(k in 1:row_number){
+     temp <- temp %>% add_row(time = time_before + (1/30)*k, acc_fw = 0, acc_vert = 0, acc_side = 0, in_step_bw = 0, in_step_fw = 0, mvm = 0, .after = insert_after - 1 + k)
+   }
+
+#Testing for correct times
+# nrow(temp)
+# for(j in 1:11978){
+#   if(temp$time[j + 1] - temp$time[j] > 0.034){
+#     print("Big gap")
+#     print(j)
+#   }
+#   if(temp$time[j+1] - temp$time[j] < 0.033){
+#     print("Small gap")
+#     print(j)
+#   }
+#   if(temp$time[j+1] - temp$time[j] > 0.033 & temp$time[j + 1] - temp$time[j] < 0.034){
+#     #print("correct")
+#   }
+# }
+
+width <- 15 
+half_width <- (width - 1)/2
+frame_tot <- nrow(temp) + 1 - width
+
+frame_list <- c()
+for(j in 1:frame_tot){
+  frame_list <- append(frame_list, rep(j, width))
+}
+
+idx_list <- c()
+for(j in 1:frame_tot){
+  idx_list <- append(idx_list, temp$time[j:(j + width - 1)])
+}
+
+val_list <- c()
+for(j in 1:frame_tot){
+  val_list <- append(val_list, temp$acc_vert[ j:(j + width - 1)])
+}
+
+colour_function <- function(df, idx){
+  if((df$in_step_bw[idx] == 0) & (df$in_step_fw[idx] == 0)){
+    return(2)
+  }
+  else if((df$in_step_bw[idx] %% 2 == 1) | (df$in_step_fw[idx] %% 2 == 1)){
+    return(3)
+  }
+  else{
+    return(4)
+  }
+}
+
+alt_colour_list <- c()
+for(j in 1:frame_tot){
+  for(k in 1:half_width){
+    alt_colour_list <- append(alt_colour_list, colour_function(temp, j - 1 + k))
+  }
+  alt_colour_list <- append(alt_colour_list, 1)
+  for(k in 1:half_width){
+    alt_colour_list <- append(alt_colour_list, colour_function(temp, j + half_width + k))
+  }
+}
+
+new <- data.frame(frame = frame_list, idx = idx_list, value = val_list, colour = alt_colour_list)
+(max(new$frame) == vid_frames) #Has to be true
+(nrow(new)/width == vid_frames) #Has to be true as well
+```
+
+```{r}
+p <- ggplot(new, aes(x = idx, y = value)) +
+  geom_line() +
+  geom_point(aes(color = factor(colour), size = factor(colour))) +
+  scale_colour_manual(values = c("0" = "red", "1" = "black", "2" = "#984EA3", "3" = "#009E73", "4" = "#E69F00")) +
+  scale_size_manual(values = c("0" = 5, "1" = 15, "2" = 5, "3" = 5, "4" = 5)) +
+  transition_states(frame, transition_length = 0, state_length = 1) +
+  view_follow() +
+  ylim(-2.2, 1.6) #Fixes y as well, but more appropriately. Can remove this so that it changes which y values it considers
+  #or view_follow(fixed_y = T)
+
+animate(p, renderer = file_renderer(dir = "frames", prefix = "frame_", overwrite = TRUE), fps = 1, width = 80, height = 32, nframes = frame_tot)
+
+ui <- fluidPage(
+  titlePanel("Frame Viewer"),
+  # Move slider and buttons above images
+  sliderInput("frame", "Frame:", min = 1, max = frame_tot, value = 1, step = 1),
+  fluidRow(
+    column(10,
+           actionButton("prev", "Previous"),
+           actionButton("next", "Next"),
+           actionButton("play_pause", "Play"),
+           numericInput("delay", "Delay (s):", value = 1/30, min = 0, step = 1/90, width = "100px")
+    )
+  ),
+  # Show both images side by side
+  fluidRow(
+    column(7, imageOutput("frame_img", width = "10%", height = "10px")),
+    column(5, imageOutput("video_img", width = "10%", height = "10px"))
+  )
+)
+
+server <- function(input, output, session) {
+  frame_dir <- "frames"
+  frame_video_dir <- "frames_video"
+  
+  frame_files <- list.files(frame_dir, pattern = "\\.png$", full.names = TRUE)
+  frame_files <- sort(frame_files)
+  
+  video_files <- list.files(frame_video_dir, pattern = "\\.jpg$", full.names = TRUE)
+  video_files <- sort(video_files)
+
+  observe({
+    updateSliderInput(session, "frame", max = length(frame_files))
+  })
+
+  observeEvent(input$`next`, {
+    new_val <- min(input$frame + 1, length(frame_files))
+    updateSliderInput(session, "frame", value = new_val)
+  })
+
+  observeEvent(input$prev, {
+    new_val <- max(input$frame - 1, 1)
+    updateSliderInput(session, "frame", value = new_val)
+  })
+
+  output$frame_img <- renderImage({
+    list(src = frame_files[input$frame], contentType = 'image/png')
+  }, deleteFile = FALSE)
+
+
+  output$video_img <- renderImage({
+    list(src = video_files[input$frame], contentType = 'image/jpg')
+  }, deleteFile = FALSE)
+  
+  playing <- reactiveVal(FALSE)
+
+  observeEvent(input$play_pause, {
+    playing(!playing())
+    updateActionButton(session, "play_pause", label = if (playing()) "Pause" else "Play")
+    })
+  # Timer to auto-advance frames
+  observe({
+    if (playing()) {
+      new_val <- if (input$frame < frame_tot) input$frame + 1 else 1
+      updateSliderInput(session, "frame", value = new_val)
+      Sys.sleep(input$delay)
+      }
+    })
+}
+
+shinyApp(ui = ui, server = server)
+```
+
+### Below is the actual pipelin
+
+```{r}
+#system("ffmpeg -i test_walk_MP4.mp4 -q:v 3 -vf \"fps=30,scale = 500:400\" frames_video/frame_%05d.jpg")
+#system("ffmpeg -t 60 -i test_thuis.mp4 -q:v 3 -vf \"fps=30,scale = 300:400\" test_thuis_vid/frame_%05d.jpg")
+system("ffmpeg -ss 00:00:40 -t 30 -i tread2.mp4 -q:v 3 -vf \"fps=30,scale=470:260,transpose=2\" tread2_vid/frame_%05d.jpg")
+```
+
+```{r}
+width <- 15
+folder_name_vid_frames <- "tread2_vid"
+vid_frames <- length(list.files(folder_name_vid_frames, pattern = "\\.jpg"))
+
+start_time <- as.POSIXct("2025-04-08 15:13:53.000")
+end_time <- start_time - (1/30) + vid_frames/30 + (width - 1)*(1/30) 
+
+#test_df <- filter(N_video, time >= start_time & time <= end_time) 
+
+#test <- filter(N_video, time > start_time & time < start_time + 40)
+#plot(test$Z, type = 'l')
+
+#plot(test_df$X, type = 'l')
+```
+
+```{r}
+start_time <- as.POSIXct("2025-04-08 11:09:23.500")
+tp <- filter(raw_df, time > start_time) %>% pull(Z)
+plot(tp[1:200], type = 'l')
+```
+
+```{r}
+start_time <- as.POSIXct("2025-04-08 11:09:23.800")
+width <- 15
+folder_name_vid_frames <- "tread2_vid"
+vid_frames <- length(list.files(folder_name_vid_frames, pattern = "\\.jpg"))
+raw_df <- N_video
+
+vid_name <- "tread2.mp4"
+folder_name_frames <- "tread2_frames"
+
+fw_bottom <- -2.5
+fw_top <- 2.5
+vert_bottom <- -2.8
+vert_top <- 2.2
+side_bottom <- -1.5
+side_top <- 1.5
+
+fig_width <- 800
+fig_height <- 320
+fix_y <- T
+
+wdw_size <- 150
+ma_data <- 5
+ma_energy <- 9
+kernel_func <- ma_gauss 
+std_dev <- 1
+upright_thresh <- 0.75
+abs_acc_thresh <- 0.1 #Can be both peak and valley. ``Sufficient acceleration''
+#Do not want footsteps to be from peak to valley or from valley to peak though!!!
+thresh_abs <- 0.005 
+thresh_rel <- 0.33 
+min_step_period <- 5
+max_step_period <- 40
+period_len <- 5 
+period_len_double <- 1
+period_thresh <- 0.18
+double_step_thresh <- 0.27
+thresh_direction <- 0.3
+
+data <- generate_data(
+                folder_name_vid_frames,
+                width, 
+                start_time, 
+                raw_df,
+                wdw_size,
+                ma_data,
+                ma_energy,
+                kernel_func,
+                std_dev,
+                upright_thresh,
+                abs_acc_thresh,
+                thresh_abs,
+                thresh_rel,
+                min_step_period,
+                max_step_period,
+                period_len,
+                period_len_double,
+                period_thresh,
+                double_step_thresh,
+                thresh_direction)
+
+shiny <- generate_server(vid_name,
+                         folder_name_vid_frames,
+                         folder_name_frames,
+                         width, 
+                         start_time, 
+                         fw_bottom,
+                         fw_top,
+                         vert_bottom,
+                         vert_top,
+                         side_bottom,
+                         side_top,
+                         fig_width,
+                         fig_height,
+                         fix_y,
+                         data)
+```
+
+```{r}
+shinyApp(ui = shiny[[1]], server = shiny[[2]])
+
+shinyApp(ui = ui, server = server)
+```
+
+#We now attempt the treadmil video, including finding out the starting time etc.
+
+```{r}
+system("ffmpeg -i tread2.mp4 -q:v 3 -vf \"fps=30,scale = 500:400,transpose=1\" tread2_vid/frame_%05d.jpg")
+system("ffmpeg -sseof -20 -i tread2.mp4 -q:v 3 -vf \"fps=30,scale=500:400,transpose=2\" tread2_vid/frame_%05d.jpg")
+system("ffmpeg -ss 00:02:48 -t 20 -i tread2.mp4 -q:v 3 -vf \"fps=30,scale=500:280,transpose=2\" tread2_vid/frame_%05d.jpg")
+
+start_time <- as.POSIXct("2025-04-08 11:13:55.000")
+width <- 15
+folder_name_vid_frames <- "tread2_vid"
+vid_frames <- length(list.files(folder_name_vid_frames, pattern = "\\.jpg"))
+end_time <- start_time - (1/30) + vid_frames/30 + (width - 1)*(1/30) 
+raw_df <- N_video %>% filter(time > start_time & time < end_time)
+
+folder_name_vid_frames <- "tread2_vid"
+folder_name_frames <- "tread2_frames"
+width <- 15
+ylim_bottom <- -0.9
+ylim_top <- 0.7
+fig_width <- 800
+fig_height <- 320
+fix_y <- T
+data <- raw_df
+
+shiny_raw <- generate_raw_server(
+                         folder_name_vid_frames,
+                         folder_name_frames,
+                         width, 
+                         ylim_bottom,
+                         ylim_top,
+                         fig_width,
+                         fig_height,
+                         fix_y,
+                         data)
+```
+

@@ -1,0 +1,44 @@
+### Importing libraries
+We first important the libraries we need.
+
+```{r, message=F, warning=F}
+#Data analysis
+library(tidyverse)
+library(patchwork)
+library(scales)
+library(RColorBrewer)
+
+#Working with the activity class and data files
+library(lubridate)
+library(read.gt3x)
+library(PhysicalActivity)
+
+#Solving equations
+library(nleqslv)
+library(pracma)
+library(latex2exp)
+
+#Reshaping / data manipulation
+library(reshape2)
+library(data.table)
+```
+
+
+```{r}
+element <- "A20"
+all <- list()
+for(item in get(paste0(element, "_list"))){
+  all <- append(all, item)
+}
+dataframes <- df_all_from_mvm(all, 250, max_vert, freq_selector, c(14,21))
+
+df1 <- dataframes[[1]] 
+df2 <- dataframes[[2]]
+df3 <- dataframes[[3]]
+
+colnames(df1) <- as.character(1:250)
+colnames(df2) <- as.character(1:250)
+colnames(df3) <- as.character(1:250)
+
+#Melting, splitting into two groups, random lines etc. can all be found in the sandboxes
+```

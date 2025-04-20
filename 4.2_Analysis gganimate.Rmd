@@ -1,0 +1,491 @@
+```{r, message=F, warning=F}
+#Data analysis
+library(tidyverse)
+library(latex2exp)
+library(patchwork)
+library(scales)
+library(RColorBrewer)
+
+#Working with the activity class and data files
+library(lubridate)
+library(read.gt3x)
+library(PhysicalActivity)
+
+#Solving equations
+library(nleqslv)
+library(pracma)
+library(latex2exp)
+
+#Reshaping / data manipulation
+library(reshape2)
+library(data.table)
+
+##gganimate/creating animations
+library(gganimate)
+library(glue)
+library(shiny)
+library(av)
+library(magick)
+```
+##Everything summary to quickly run
+
+```{r}
+shinyApp(ui = shiny_raw_walk1[[1]], server = shiny_raw_walk1[[2]])
+shinyApp(ui = shiny_walkRocco[[1]], server = shiny_walkRocco[[2]])
+shinyApp(ui = shiny_home1[[1]], server = shiny_home1[[2]])
+shinyApp(ui = shiny_tread2[[1]], server = shiny_tread2[[2]])
+```
+
+
+## Everything for walkRicco
+
+```{r}
+raw_df <- Walk1
+start_time <- as.POSIXct("2025-01-20 10:31:19.372")
+test <- raw_df %>% filter(time > start_time & time < start_time + 20)
+plot(test$X, type = 'l')
+
+start_time <- as.POSIXct("2025-04-08 15:18:16.50")
+folder_name <- "walkRocco"
+cmd <- paste0("ffmpeg -ss 00:00:00 -t 70 -i frames/", folder_name, "/", folder_name, ".MTS -q:v 3 -vf \"fps=30,scale=600:340\" frames/", folder_name, "/raw/frame_%05d.jpg")
+system(cmd)
+
+width <- 15
+fix_y <- F
+X_bottom <- -5
+X_top <- 5
+Z_bottom <- -5
+Z_top <- 5
+Y_bottom <- -5
+Y_top <- 5
+
+generate_raw_images(folder_name,
+                    width,
+                    start_time,
+                    raw_df,
+                    fix_y,
+                    X_bottom,
+                    X_top,
+                    Y_bottom,
+                    Y_top,
+                    Z_bottom,
+                    Z_top)
+
+streamvid <- "raw"
+stream1 <- "X"
+stream2 <- "Y"
+stream3 <- "Z"
+
+vid_frames <- length(list.files(paste0("frames/", folder_name, "/raw"), pattern = "\\.jpg"))
+
+shiny_raw_walk1 <- generate_server(vid_frames,
+                         folder_name,
+                         streamvid,
+                         stream1,
+                         stream2,
+                         stream3)
+
+shinyApp(ui = shiny_raw_walk1[[1]], server = shiny_raw_walk1[[2]])
+```
+
+```{r}
+cmd <- paste0("ffmpeg -ss 00:00:00 -t 500 -i frames/", folder_name, "/", folder_name, ".MTS -q:v 3 -vf \"fps=30,scale=600:340\" frames/", folder_name, "/video/frame_%05d.jpg")
+system(cmd)
+
+vid_frames <- length(list.files(paste0("frames/", folder_name, "/video"), pattern = "\\.jpg"))
+start_time <- as.POSIXct("2025-01-20 10:31:19.372")
+
+#Image generation parameters
+fw_bottom <- -2.5
+fw_top <- 2.5
+vert_bottom <- -2.7
+vert_top <- 2.2
+side_bottom <- -1.5
+side_top <- 1.5
+fig_width <- 800
+fig_height <- 320
+fix_y <- T
+
+#Step partition parameters
+wdw_size <- 120
+ma_data <- 5
+ma_energy <- 9
+kernel_func <- ma_gauss 
+std_dev <- 1
+upright_thresh <- 0.75
+abs_acc_thresh <- 0.1 
+thresh_abs <- 0.005 
+thresh_rel <- 0.27 
+min_step_period <- 5
+max_step_period <- 40
+period_len <- 5 
+period_len_double <- 5 #This is what I changed! Used to be 1, but can be higher sensibly
+period_thresh <- 0.14
+double_step_thresh <- 0.21
+thresh_direction <- 0.3
+
+data_walkRocco <- generate_data(folder_name,
+                width, 
+                start_time, 
+                raw_df,
+                wdw_size,
+                ma_data,
+                ma_energy,
+                kernel_func,
+                std_dev,
+                upright_thresh,
+                abs_acc_thresh,
+                thresh_abs,
+                thresh_rel,
+                min_step_period,
+                max_step_period,
+                period_len,
+                period_len_double,
+                period_thresh,
+                double_step_thresh,
+                thresh_direction)
+
+steps_info_walkRocco <- df_all_from_mvm_alt_nofilter(data_walkRocco, 200, min_square_difference_vert)
+
+generate_images_avg(steps_info_walkRocco, 0.8, folder_name)
+  
+generate_images(folder_name,
+                         width, 
+                         start_time, 
+                         fw_bottom,
+                         fw_top,
+                         vert_bottom,
+                         vert_top,
+                         side_bottom,
+                         side_top,
+                         fig_width,
+                         fig_height,
+                         fix_y,
+                         data_walkRocco)
+
+streamvid <- "video"
+stream1 <- "Forward"
+stream2 <- "Vertical"
+stream3 <- "Sideways"
+
+streamvid <- "raw"
+stream1 <- "X"
+stream2 <- "Y"
+stream3 <- "Z"
+
+shiny_walkRocco <- generate_server(vid_frames,
+                         folder_name,
+                         streamvid,
+                         stream1,
+                         stream2,
+                         stream3)
+
+shinyApp(ui = shiny_walkRocco[[1]], server = shiny_walkRocco[[2]])
+```
+
+
+##Everything for home1
+
+Getting an idea of where the ending of the video roughly is
+
+```{r}
+raw_df <- N_video
+start_time <- as.POSIXct("2025-04-08 15:18:26.500")
+test <- raw_df %>% filter(time > start_time & time < start_time + 20)
+plot(test$X, type = 'l')
+
+start_time <- as.POSIXct("2025-04-08 15:18:16.500")
+folder_name <- "home1"
+cmd <- paste0("ffmpeg -ss 00:04:30 -t 300 -i frames/", folder_name, "/", folder_name, ".mp4 -q:v 3 -vf \"fps=30,scale=280:500\" frames/", folder_name, "/raw/frame_%05d.jpg")
+system(cmd)
+
+width <- 15
+fix_y <- F
+X_bottom <- -5
+X_top <- 5
+Z_bottom <- -5
+Z_top <- 5
+Y_bottom <- -5
+Y_top <- 5
+
+generate_raw_images(folder_name,
+                    width,
+                    start_time,
+                    raw_df,
+                    fix_y,
+                    X_bottom,
+                    X_top,
+                    Y_bottom,
+                    Y_top,
+                    Z_bottom,
+                    Z_top)
+
+streamvid <- "raw"
+stream1 <- "X"
+stream2 <- "Y"
+stream3 <- "Z"
+
+vid_frames <- length(list.files(paste0("frames/", folder_name, "/raw"), pattern = "\\.jpg"))
+
+shiny_raw_home1 <- generate_server(vid_frames,
+                         folder_name,
+                         streamvid,
+                         stream1,
+                         stream2,
+                         stream3)
+
+shinyApp(ui = shiny_raw_home1[[1]], server = shiny_raw_home1[[2]])
+```
+
+###Body!
+
+Once the starting time has been established we can generate the images of oriented acceleration including steps and host the application.
+
+```{r}
+cmd <- paste0("ffmpeg -ss 00:00:00 -t 300 -i frames/", folder_name, "/", folder_name, ".mp4 -q:v 3 -vf \"fps=30,scale=280:500\" frames/", folder_name, "/video/frame_%05d.jpg")
+system(cmd)
+
+vid_frames <- length(list.files(paste0("frames/", folder_name, "/video"), pattern = "\\.jpg"))
+start_time <- as.POSIXct("2025-04-08 15:13:53.972")
+
+#Image generation parameters
+fw_bottom <- -2.3
+fw_top <- 2.3
+vert_bottom <- -2.5
+vert_top <- 2
+side_bottom <- -1.3
+side_top <- 1.3
+fig_width <- 800
+fig_height <- 320
+fix_y <- T
+
+#Step partition parameters
+wdw_size <- 150
+ma_data <- 5
+ma_energy <- 9
+kernel_func <- ma_gauss 
+std_dev <- 1
+upright_thresh <- 0.75
+abs_acc_thresh <- 0.1 
+thresh_abs <- 0.005 
+thresh_rel <- 0.33 
+min_step_period <- 5
+max_step_period <- 40
+period_len <- 4 
+period_len_double <- 2 #This is what I changed! Used to be 1, but can be higher sensibly
+period_thresh <- 0.18
+double_step_thresh <- 0.27
+thresh_direction <- 0.3
+
+data_home1 <- generate_data(folder_name,
+                width, 
+                start_time, 
+                raw_df,
+                wdw_size,
+                ma_data,
+                ma_energy,
+                kernel_func,
+                std_dev,
+                upright_thresh,
+                abs_acc_thresh,
+                thresh_abs,
+                thresh_rel,
+                min_step_period,
+                max_step_period,
+                period_len,
+                period_len_double,
+                period_thresh,
+                double_step_thresh,
+                thresh_direction)
+
+steps_info_home1 <- df_all_from_mvm_alt_nofilter(data_home1, 200, min_square_difference_vert)
+
+generate_images_avg(steps_info_home1, 0.8, folder_name)
+  
+generate_images(folder_name,
+                         width, 
+                         start_time, 
+                         fw_bottom,
+                         fw_top,
+                         vert_bottom,
+                         vert_top,
+                         side_bottom,
+                         side_top,
+                         fig_width,
+                         fig_height,
+                         fix_y,
+                         data)
+
+streamvid <- "video"
+stream1 <- "Forward"
+stream2 <- "Vertical"
+stream3 <- "Sideways"
+
+streamvid <- "raw"
+stream1 <- "X"
+stream2 <- "Y"
+stream3 <- "Z"
+
+shiny_home1 <- generate_server(vid_frames,
+                         folder_name,
+                         streamvid,
+                         stream1,
+                         stream2,
+                         stream3)
+
+shinyApp(ui = shiny_home1[[1]], server = shiny_home1[[2]])
+```
+
+
+
+
+
+##Everything for tread2
+
+Getting an idea of where the ending of the video roughly is
+
+```{r}
+start_time <- as.POSIXct("2025-04-08 11:14:39.800")
+test <- raw_df %>% filter(time > start_time & time < start_time + 20)
+plot(test$X, type = 'l')
+```
+
+We first have to generate a raw version of the application of the end of the video. This also helps in establishing a starting time.
+
+```{r}
+cmd <- paste0("ffmpeg -ss 00:00:00 -t 500 -i frames/", folder_name, "/", folder_name, ".mp4 -q:v 3 -vf \"fps=30,scale=500:280,transpose=2\" frames/", folder_name, "/raw/frame_%05d.jpg")
+system(cmd)
+start_time <- as.POSIXct("2025-04-08 11:14:23.335")
+folder_name <- "tread2"
+
+width <- 15
+raw_df <- N_video
+fix_y <- F
+X_bottom <- -Inf
+X_top <- Inf
+Z_bottom <- -Inf
+Z_top <- Inf
+Y_bottom <- -Inf
+Y_top <- Inf
+
+generate_raw_images(folder_name,
+                    width,
+                    start_time,
+                    raw_df,
+                    fix_y,
+                    X_bottom,
+                    X_top,
+                    Y_bottom,
+                    Y_top,
+                    Z_bottom,
+                    Z_top)
+```
+
+#Body!
+
+Once the starting time has been established we can generate the images of oriented acceleration including steps and host the application.
+
+```{r}
+#Start_time and associated frames
+folder_name <- "tread2"
+vid_frames <- length(list.files(paste0("frames/", folder_name, "/video"), pattern = "\\.jpg"))
+
+cmd <- paste0("ffmpeg -ss 00:02:48 -t 30 -i frames/", folder_name, "/", folder_name, ".mp4 -q:v 3 -vf \"fps=30,scale=500:280,transpose=2\" frames/", folder_name, "/video/frame_%05d.jpg")
+system(cmd)
+start_time <- as.POSIXct("2025-04-08 11:09:23.800")
+
+cmd <- paste0("ffmpeg -ss 00:00:00 -t 500 -i frames/", folder_name, "/", folder_name, ".mp4 -q:v 3 -vf \"fps=30,scale=500:280,transpose=2\" frames/", folder_name, "/video/frame_%05d.jpg")
+system(cmd)
+start_time <- as.POSIXct("2025-04-08 11:08:33.335")
+
+#Dataframe selection and cleaning parameters
+width <- 15
+raw_df <- N_video
+
+#Image generation parameters
+fw_bottom <- -3
+fw_top <- 3
+vert_bottom <- -3
+vert_top <- 2.5
+side_bottom <- -1.6
+side_top <- 1.6
+fig_width <- 800
+fig_height <- 320
+fix_y <- T
+
+#Step partition parameters
+wdw_size <- 150
+ma_data <- 5
+ma_energy <- 9
+kernel_func <- ma_gauss 
+std_dev <- 1
+upright_thresh <- 0.75
+abs_acc_thresh <- 0.1 
+thresh_abs <- 0.005 
+thresh_rel <- 0.33 
+min_step_period <- 5
+max_step_period <- 40
+period_len <- 5 
+period_len_double <- 1
+period_thresh <- 0.18
+double_step_thresh <- 0.27
+thresh_direction <- 0.3
+
+data <- generate_data(folder_name,
+                width, 
+                start_time, 
+                raw_df,
+                wdw_size,
+                ma_data,
+                ma_energy,
+                kernel_func,
+                std_dev,
+                upright_thresh,
+                abs_acc_thresh,
+                thresh_abs,
+                thresh_rel,
+                min_step_period,
+                max_step_period,
+                period_len,
+                period_len_double,
+                period_thresh,
+                double_step_thresh,
+                thresh_direction)
+
+steps_info_tread2 <- df_all_from_mvm_alt_nofilter(data, 200, min_square_difference_vert)
+
+generate_images_avg(steps_info_tread2, 0.2, folder_name)
+  
+generate_images(folder_name,
+                         width, 
+                         start_time, 
+                         fw_bottom,
+                         fw_top,
+                         vert_bottom,
+                         vert_top,
+                         side_bottom,
+                         side_top,
+                         fig_width,
+                         fig_height,
+                         fix_y,
+                         data)
+
+streamvid <- "video"
+stream1 <- "Forward"
+stream2 <- "Vertical"
+stream3 <- "Sideways"
+
+streamvid <- "raw"
+stream1 <- "X"
+stream2 <- "Y"
+stream3 <- "Z"
+
+shiny_tread2 <- generate_server(vid_frames,
+                         folder_name,
+                         streamvid,
+                         stream1,
+                         stream2,
+                         stream3)
+
+shinyApp(ui = shiny_tread2[[1]], server = shiny_tread2[[2]])
+```

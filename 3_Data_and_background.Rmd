@@ -1,0 +1,622 @@
+### Importing libraries
+We first import the libraries we need.
+
+```{r, message=F, warning=F}
+#Data analysis
+library(tidyverse)
+library(patchwork)
+library(scales)
+library(RColorBrewer)
+
+#Working with the activity class and data files
+library(lubridate)
+library(read.gt3x)
+library(PhysicalActivity)
+
+#Solving equations
+library(nleqslv)
+library(pracma)
+```
+
+### Importing data
+We now import the data
+
+```{r, message=F, warning=F}
+raw_file_names <- list("S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", "H10", "H11", "H12", "H13", "H14", "H15", "H16", "H17", "H18", "H19", "A20", "A21")
+
+for(name in raw_file_names) {
+  file_path <- paste0("Data_raw/", name, ".gt3x")
+  assign(name, read.gt3x(file_path))
+}
+
+rm(file_path) #Or put into a function/temporary block instead
+
+#If epoch files are needed:
+#epoch_20 <- readActigraph("Data_epoch/20.agd", convertTime = TRUE)
+```
+
+We now convert these raw files to dataframes. We also force the time zone to be correct, as this is shifted wrongly in the package we use otherwise, and we only take non-missing values.  
+
+```{r, message=F, warning=F}
+for(name in raw_file_names){
+
+  object <- get(name)
+  object <- as.data.frame(object)
+  object$time <- force_tz(object$time, tzone = "Europe/Berlin")
+  
+  missingness_df <- attributes(object)$missingness
+  time_missing <- missingness_df[missingness_df$n_missing > 90, 1]
+  
+  #If no values missing for more than the specified number of time, length of time_missing will be 0
+  if(length(time_missing) != 0){
+    object <- filter(object, time < time_missing[1])
+  }
+  
+  assign(name, object)
+}
+
+rm(object, name, time_missing, missingness_df)
+```
+
+Now we get out the metadata to fill in the table.
+
+```{r, message=F, warning=F}
+for(name in raw_file_names) {
+  
+  object <- get(name)
+  
+  print(name)
+  print(paste("Age: ", attributes(object)$header$Age))
+  print(paste("Sex: ", attributes(object)$header$Sex))
+  print(paste("Weight: ", attributes(object)$header$Mass))
+  print(paste("Height: ", attributes(object)$header$Height))
+  print(paste("Start time: ", attributes(object)$header$`Start Date`))
+  print(paste("End time: ", tail(object, n = 1)$time))
+  print(paste("Serial number: ", attributes(object)$header$`Serial Number`))
+  print("-------------")
+}
+
+
+rm(object, name)
+```
+
+### Error computation
+
+```{r}
+start_times <- c(as.POSIXct("2022-11-07 01:00:00.000"), 
+                 as.POSIXct("2023-05-27 01:00:00.000"),
+                 as.POSIXct("2023-08-26 01:00:00.000"),
+                 as.POSIXct("2023-04-09 01:00:00.000"),
+                 as.POSIXct("2023-05-13 01:00:00.000"),
+                 as.POSIXct("2023-03-25 01:00:00.000"),
+                 as.POSIXct("2023-03-25 01:00:00.000"),
+                 as.POSIXct("2023-09-15 01:00:00.000"),
+                 as.POSIXct("2022-09-24 01:00:00.000"),
+                 as.POSIXct("2024-01-07 01:00:00.000"),
+                 as.POSIXct("2024-01-07 01:00:00.000"),
+                 as.POSIXct("2024-06-15 01:00:00.000"),
+                 as.POSIXct("2024-03-13 01:00:00.000"),
+                 as.POSIXct("2024-03-13 01:00:00.000"),
+                 as.POSIXct("2024-03-13 01:00:00.000"),
+                 as.POSIXct("2024-03-28 01:00:00.000"),
+                 as.POSIXct("2024-03-27 01:00:00.000"),
+                 as.POSIXct("2024-03-27 01:00:00.000"),
+                 as.POSIXct("2024-04-24 01:00:00.000"),
+                 as.POSIXct("2024-10-11 01:00:00.000"),
+                 as.POSIXct("2024-11-23 01:00:00.000"))
+
+end_times <- c(as.POSIXct("2022-11-07 05:00:00.000"), 
+                 as.POSIXct("2023-05-27 05:00:00.000"),
+                 as.POSIXct("2023-08-26 05:00:00.000"),
+                 as.POSIXct("2023-04-09 05:00:00.000"),
+                 as.POSIXct("2023-05-13 05:00:00.000"),
+                 as.POSIXct("2023-03-25 05:00:00.000"),
+                 as.POSIXct("2023-03-25 05:00:00.000"),
+                 as.POSIXct("2023-09-15 05:00:00.000"),
+                 as.POSIXct("2022-09-24 05:00:00.000"),
+                 as.POSIXct("2024-01-07 05:00:00.000"),
+                 as.POSIXct("2024-01-07 05:00:00.000"),
+                 as.POSIXct("2024-06-15 05:00:00.000"),
+                 as.POSIXct("2024-03-13 05:00:00.000"),
+                 as.POSIXct("2024-03-13 05:00:00.000"),
+                 as.POSIXct("2024-03-13 05:00:00.000"),
+                 as.POSIXct("2024-03-28 05:00:00.000"),
+                 as.POSIXct("2024-03-27 05:00:00.000"),
+                 as.POSIXct("2024-03-27 05:00:00.000"),
+                 as.POSIXct("2024-04-24 05:00:00.000"),
+                 as.POSIXct("2024-10-11 05:00:00.000"),
+                 as.POSIXct("2024-11-23 05:00:00.000"))
+
+error_dataframes_X <- compute_rest_dataframes(raw_file_names, 2, start_times, end_times)
+error_dataframes_Y <- compute_rest_dataframes(raw_file_names, 3, start_times, end_times)
+error_dataframes_Z <- compute_rest_dataframes(raw_file_names, 4, start_times, end_times)
+
+all_errors_X <- do.call(rbind, error_dataframes_X)
+all_errors_Y <- do.call(rbind, error_dataframes_Y)
+all_errors_Z <- do.call(rbind, error_dataframes_Z)
+all_errors_X$error %>% abs() %>% mean()
+all_errors_Y$error %>% abs() %>% mean()
+all_errors_Z$error %>% abs() %>% mean()
+all_errors_X$error %>% abs() %>% max()
+all_errors_Y$error %>% abs() %>% max()
+all_errors_Z$error %>% abs() %>% max()
+all_errors_X$error %>% var()
+all_errors_Y$error %>% var()
+all_errors_Z$error %>% var()
+```
+
+```{r}
+theme_readable = theme(axis.title = element_text(size = 14), 
+                 axis.text = element_text(size = 14),
+                 legend.title = element_text(size = 14),
+                 legend.text = element_text(size = 11))
+```
+
+```{r}
+# all_errors_X %>% 
+#   ggplot(aes(x = error, color  = factor(df, levels = raw_file_names))) + 
+#   geom_density()  +
+#   scale_fill_manual(values = hue_pal()(21)) +
+#   xlim(-0.017, 0.015) +
+#   labs(x = "Difference to mean",
+#        y = "Number of observations",
+#        color ="Raw file name") + 
+#   theme_minimal()
+
+all_errors_X %>% 
+  ggplot(aes(x = error, color  = factor(df, levels = raw_file_names))) + 
+  geom_histogram(bins = 30)  +
+  scale_fill_manual(values = hue_pal()(21)) +
+  xlim(-0.0175, 0.0175) +
+  labs(x = "Difference to mean (g)",
+       y = "Number of observations",
+       color ="Raw file name") + 
+  theme_minimal() + 
+  theme_readable
+
+all_errors_Y %>% 
+  ggplot(aes(x = error, color  = factor(df, levels = raw_file_names))) + 
+  geom_histogram(bins = 30)  +
+  scale_fill_manual(values = hue_pal()(21)) +
+  xlim(-0.0175, 0.0175) +
+  labs(x = "Difference to mean (g)",
+       y = "Number of observations",
+       color ="Raw file name") + 
+  theme_minimal() + 
+  theme_readable
+
+all_errors_Z %>% 
+  ggplot(aes(x = error, color  = factor(df, levels = raw_file_names))) + 
+  geom_histogram(bins = 30)  +
+  scale_fill_manual(values = hue_pal()(21)) +
+  xlim(-0.0175, 0.0175) +
+  labs(x = "Difference to mean (g)",
+       y = "Number of observations",
+       color ="Raw file name") + 
+  theme_minimal() + 
+  theme_readable
+```
+
+### Offset computation
+
+```{r}
+start_times <- c(as.POSIXct("2022-11-07 02:00:00.000"),
+                 as.POSIXct("2022-11-10 02:00:00.000"),
+                 as.POSIXct("2022-11-11 02:00:00.000"),
+                 as.POSIXct("2022-11-12 02:00:00.000")
+                 )
+end_times  <- c(as.POSIXct("2022-11-07 03:00:00.000"),
+                as.POSIXct("2022-11-10 03:00:00.000"),
+                as.POSIXct("2022-11-11 03:00:00.000"),
+                as.POSIXct("2022-11-12 03:00:00.000")
+                )
+#offsets <- compute_and_verify_offsets(S1, start_times, end_times, 1.0006, 0.2, 0.0001, 0.02)
+offsets <- compute_and_verify_offsets_alt(S1, start_times, end_times, 1.0006, 0.2, 0.0001, 0.02)
+S1_off <- S1
+S1_off[,2] <- S1[,2] + offsets[1]
+S1_off[,3] <- S1[,3] + offsets[2]
+S1_off[,4] <- S1[,4] + offsets[3]
+
+start_times <- c(as.POSIXct("2023-05-27 02:00:00.000"),
+                 as.POSIXct("2023-05-28 02:00:00.000"),
+                 as.POSIXct("2023-05-30 02:00:00.000"),
+                 as.POSIXct("2023-05-29 02:00:00.000")
+                 )
+end_times  <- c(as.POSIXct("2023-05-27 03:00:00.000"),
+                as.POSIXct("2023-05-28 03:00:00.000"),
+                as.POSIXct("2023-05-30 03:00:00.000"),
+                as.POSIXct("2023-05-29 03:00:00.000")
+                )
+#offsets <- compute_and_verify_offsets(S2, start_times, end_times, 1.0006, 0.2, 0.0001, 0.02)
+offsets <- compute_and_verify_offsets_alt(S2, start_times, end_times, 1.0006, 0.2, 0.0001, 0.02)
+S2_off <- S2
+S2_off[,2] <- S2[,2] + offsets[1]
+S2_off[,3] <- S2[,3] + offsets[2]
+S2_off[,4] <- S2[,4] + offsets[3]
+
+start_times <- c(as.POSIXct("2023-08-26 02:00:00.000"),
+                 as.POSIXct("2023-08-27 02:00:00.000"),
+                 as.POSIXct("2023-08-28 02:00:00.000"),
+                 as.POSIXct("2023-08-29 02:00:00.000")
+                 )
+end_times  <- c(as.POSIXct("2023-08-26 03:00:00.000"),
+                as.POSIXct("2023-08-27 03:00:00.000"),
+                as.POSIXct("2023-08-28 03:00:00.000"),
+                as.POSIXct("2023-08-29 03:00:00.000")
+                )
+offsets <- compute_and_verify_offsets_alt(S3, start_times, end_times, 1.0006, 0.2, 0.0001, 0.02)
+S3_off <- S3
+S3_off[,2] <- S3[,2] + offsets[1]
+S3_off[,3] <- S3[,3] + offsets[2]
+S3_off[,4] <- S3[,4] + offsets[3]
+
+start_times <- c(as.POSIXct("2023-04-09 02:00:00.000"),
+                 as.POSIXct("2023-04-14 02:00:00.000"),
+                 as.POSIXct("2023-04-15 02:00:00.000"),
+                 as.POSIXct("2023-04-12 02:00:00.000")
+)
+end_times  <- c(as.POSIXct("2023-04-09 03:00:00.000"),
+                as.POSIXct("2023-04-14 03:00:00.000"),
+                as.POSIXct("2023-04-15 03:00:00.000"),
+                as.POSIXct("2023-04-12 03:00:00.000")
+)
+offsets <- compute_and_verify_offsets_alt(S4, start_times, end_times, 1.0006, 0.2, 0.0001, 0.02)
+S4_off <- S4
+S4_off[,2] <- S4[,2] + offsets[1]
+S4_off[,3] <- S4[,3] + offsets[2]
+S4_off[,4] <- S4[,4] + offsets[3]
+
+start_times <- c(as.POSIXct("2023-05-13 02:00:00.000"),
+                 as.POSIXct("2023-05-14 02:00:00.000"),
+                 as.POSIXct("2023-05-15 02:00:00.000"),
+                 as.POSIXct("2023-05-19 02:00:00.000")
+)
+end_times  <- c(as.POSIXct("2023-05-13 03:00:00.000"),
+                as.POSIXct("2023-05-14 03:00:00.000"),
+                as.POSIXct("2023-05-15 03:00:00.000"),
+                as.POSIXct("2023-05-19 03:00:00.000")
+)
+offsets <- compute_and_verify_offsets_alt(S5, start_times, end_times, 1.0006, 0.2, 0.0001, 0.02)
+S5_off <- S5
+S5_off[,2] <- S5[,2] + offsets[1]
+S5_off[,3] <- S5[,3] + offsets[2]
+S5_off[,4] <- S5[,4] + offsets[3]
+
+start_times <- c(as.POSIXct("2023-03-25 02:00:00.000"),
+                 as.POSIXct("2023-03-26 02:00:00.000"),
+                 as.POSIXct("2023-03-27 02:00:00.000"),
+                 as.POSIXct("2023-03-28 02:00:00.000")
+)
+end_times  <- c(as.POSIXct("2023-03-25 03:00:00.000"),
+                as.POSIXct("2023-03-26 03:00:00.000"),
+                as.POSIXct("2023-03-27 03:00:00.000"),
+                as.POSIXct("2023-03-28 03:00:00.000")
+)
+offsets <- compute_and_verify_offsets_alt(S6, start_times, end_times, 1.0006, 0.2, 0.0001, 0.1)
+S6_off <- S6
+S6_off[,2] <- S6[,2] + offsets[1]
+S6_off[,3] <- S6[,3] + offsets[2]
+S6_off[,4] <- S6[,4] + offsets[3]
+
+start_times <- c(as.POSIXct("2023-03-25 02:00:00.000"),
+                 as.POSIXct("2023-03-26 02:00:00.000"),
+                 as.POSIXct("2023-03-30 02:00:00.000"),
+                 as.POSIXct("2023-03-29 02:00:00.000")
+)
+end_times  <- c(as.POSIXct("2023-03-25 03:00:00.000"),
+                as.POSIXct("2023-03-26 03:00:00.000"),
+                as.POSIXct("2023-03-30 03:00:00.000"),
+                as.POSIXct("2023-03-29 03:00:00.000")
+)
+offsets <- compute_and_verify_offsets_alt(S7, start_times, end_times, 1.0006, 0.2, 0.0001, 0.02)
+S7_off <- S7
+S7_off[,2] <- S7[,2] + offsets[1]
+S7_off[,3] <- S7[,3] + offsets[2]
+S7_off[,4] <- S7[,4] + offsets[3]
+
+start_times <- c(as.POSIXct("2023-09-15 02:00:00.000"),
+                 as.POSIXct("2023-09-16 02:00:00.000"),
+                 as.POSIXct("2023-09-21 02:00:00.000"),
+                 as.POSIXct("2023-09-18 02:00:00.000")
+)
+end_times  <- c(as.POSIXct("2023-09-15 03:00:00.000"),
+                as.POSIXct("2023-09-16 03:00:00.000"),
+                as.POSIXct("2023-09-21 03:00:00.000"),
+                as.POSIXct("2023-09-18 03:00:00.000")
+)
+offsets <- compute_and_verify_offsets_alt(S8, start_times, end_times, 1.0006, 0.2, 0.0001, 0.02)
+S8_off <- S8
+S8_off[,2] <- S8[,2] + offsets[1]
+S8_off[,3] <- S8[,3] + offsets[2]
+S8_off[,4] <- S8[,4] + offsets[3]
+
+start_times <- c(as.POSIXct("2022-09-24 02:00:00.000"),
+                 as.POSIXct("2022-09-25 02:00:00.000"),
+                 as.POSIXct("2022-09-28 02:00:00.000"),
+                 as.POSIXct("2022-09-26 02:00:00.000")
+                 )
+end_times  <- c(as.POSIXct("2022-09-24 03:00:00.000"),
+                as.POSIXct("2022-09-25 03:00:00.000"),
+                as.POSIXct("2022-09-28 03:00:00.000"),
+                as.POSIXct("2022-09-26 03:00:00.000")
+)
+
+offsets <- compute_and_verify_offsets_alt(S9, start_times, end_times, 1.0006, 0.2, 0.0001, 0.02)
+S9_off <- S9
+S9_off[,2] <- S9[,2] + offsets[1]
+S9_off[,3] <- S9[,3] + offsets[2]
+S9_off[,4] <- S9[,4] + offsets[3]
+
+start_times <- c(as.POSIXct("2024-01-07 02:00:00.000"),
+                 as.POSIXct("2024-01-08 02:00:00.000"),
+                 as.POSIXct("2024-01-11 02:00:00.000"),
+                 as.POSIXct("2024-01-15 02:00:00.000")
+)
+end_times  <- c(as.POSIXct("2024-01-07 03:00:00.000"),
+                as.POSIXct("2024-01-08 03:00:00.000"),
+                as.POSIXct("2024-01-11 03:00:00.000"),
+                as.POSIXct("2024-01-15 03:00:00.000")
+)
+
+offsets <- compute_and_verify_offsets_alt(H10, start_times, end_times, 1.0006, 0.2, 0.0001, 0.02)
+H10_off <- H10
+H10_off[,2] <- H10[,2] + offsets[1]
+H10_off[,3] <- H10[,3] + offsets[2]
+H10_off[,4] <- H10[,4] + offsets[3]
+
+start_times <- c(as.POSIXct("2024-01-13 02:00:00.000"),
+                 as.POSIXct("2024-01-14 02:00:00.000"),
+                 as.POSIXct("2024-01-11 02:00:00.000"),
+                 as.POSIXct("2024-01-07 02:00:00.000")
+)
+end_times  <- c(as.POSIXct("2024-01-13 03:00:00.000"),
+                as.POSIXct("2024-01-14 03:00:00.000"),
+                as.POSIXct("2024-01-11 03:00:00.000"),
+                as.POSIXct("2024-01-07 03:00:00.000")
+)
+
+offsets <- compute_and_verify_offsets_alt(H11, start_times, end_times, 1.0006, 0.2, 0.0001, 0.02)
+H11_off <- H11
+H11_off[,2] <- H11[,2] + offsets[1]
+H11_off[,3] <- H11[,3] + offsets[2]
+H11_off[,4] <- H11[,4] + offsets[3]
+
+start_times <- c(as.POSIXct("2024-06-17 02:00:00.000"),
+                 as.POSIXct("2024-06-18 02:00:00.000"),
+                 as.POSIXct("2024-06-14 02:00:00.000"),
+                 as.POSIXct("2024-06-19 02:00:00.000")
+)
+end_times  <- c(as.POSIXct("2024-06-17 03:00:00.000"),
+                as.POSIXct("2024-06-18 03:00:00.000"),
+                as.POSIXct("2024-06-14 03:00:00.000"),
+                as.POSIXct("2024-06-19 03:00:00.000")
+)
+
+offsets <- compute_and_verify_offsets_alt(H12, start_times, end_times, 1.0006, 0.2, 0.0001, 0.02)
+H12_off <- H12
+H12_off[,2] <- H12[,2] + offsets[1]
+H12_off[,3] <- H12[,3] + offsets[2]
+H12_off[,4] <- H12[,4] + offsets[3]
+
+start_times <- c(as.POSIXct("2024-03-13 02:00:00.000"),
+                 as.POSIXct("2024-03-18 02:00:00.000"),
+                 as.POSIXct("2024-03-15 02:00:00.000"),
+                 as.POSIXct("2024-03-16 02:00:00.000")
+)
+end_times  <- c(as.POSIXct("2024-03-13 03:00:00.000"),
+                as.POSIXct("2024-03-18 03:00:00.000"),
+                as.POSIXct("2024-03-15 03:00:00.000"),
+                as.POSIXct("2024-03-16 03:00:00.000")
+)
+
+offsets <- compute_and_verify_offsets_alt(H13, start_times, end_times, 1.0006, 0.2, 0.0001, 0.02)
+H13_off <- H13
+H13_off[,2] <- H13[,2] + offsets[1]
+H13_off[,3] <- H13[,3] + offsets[2]
+H13_off[,4] <- H13[,4] + offsets[3]
+
+start_times <- c(as.POSIXct("2024-03-13 02:00:00.000"),
+                 as.POSIXct("2024-03-14 02:00:00.000"),
+                 as.POSIXct("2024-03-21 02:00:00.000"),
+                 as.POSIXct("2024-03-22 02:00:00.000")
+)
+end_times  <- c(as.POSIXct("2024-03-13 03:00:00.000"),
+                as.POSIXct("2024-03-14 03:00:00.000"),
+                as.POSIXct("2024-03-21 03:00:00.000"),
+                as.POSIXct("2024-03-22 03:00:00.000")
+)
+
+offsets <- compute_and_verify_offsets_alt(H14, start_times, end_times, 1.0006, 0.2, 0.0001, 0.02)
+H14_off <- H14
+H14_off[,2] <- H14[,2] + offsets[1]
+H14_off[,3] <- H14[,3] + offsets[2]
+H14_off[,4] <- H14[,4] + offsets[3]
+
+start_times <- c(as.POSIXct("2024-03-13 02:00:00.000"),
+                 as.POSIXct("2024-03-14 02:00:00.000"),
+                 as.POSIXct("2024-03-21 02:00:00.000"),
+                 as.POSIXct("2024-03-15 02:00:00.000")
+)
+end_times  <- c(as.POSIXct("2024-03-13 03:00:00.000"),
+                as.POSIXct("2024-03-14 03:00:00.000"),
+                as.POSIXct("2024-03-21 03:00:00.000"),
+                as.POSIXct("2024-03-15 03:00:00.000")
+)
+
+offsets <- compute_and_verify_offsets_alt(H15, start_times, end_times, 1.0006, 0.2, 0.0001, 0.02)
+H15_off <- H15
+H15_off[,2] <- H15[,2] + offsets[1]
+H15_off[,3] <- H15[,3] + offsets[2]
+H15_off[,4] <- H15[,4] + offsets[3]
+
+start_times <- c(as.POSIXct("2024-03-28 02:00:00.000"),
+                 as.POSIXct("2024-03-29 02:00:00.000"),
+                 as.POSIXct("2024-03-31 02:00:00.000"),
+                 as.POSIXct("2024-03-30 02:00:00.000")
+)
+end_times  <- c(as.POSIXct("2024-03-28 03:00:00.000"),
+                as.POSIXct("2024-03-29 03:00:00.000"),
+                as.POSIXct("2024-03-31 03:00:00.000"),
+                as.POSIXct("2024-03-30 03:00:00.000")
+)
+
+offsets <- compute_and_verify_offsets_alt(H16, start_times, end_times, 1.0006, 0.2, 0.0001, 0.02)
+H16_off <- H16
+H16_off[,2] <- H16[,2] + offsets[1]
+H16_off[,3] <- H16[,3] + offsets[2]
+H16_off[,4] <- H16[,4] + offsets[3]
+
+start_times <- c(as.POSIXct("2024-03-29 02:00:00.000"),
+                 as.POSIXct("2024-03-30 02:00:00.000"),
+                 as.POSIXct("2024-03-31 02:00:00.000"),
+                 as.POSIXct("2024-04-03 02:00:00.000")
+)
+end_times  <- c(as.POSIXct("2024-03-29 03:00:00.000"),
+                as.POSIXct("2024-03-30 03:00:00.000"),
+                as.POSIXct("2024-03-31 03:00:00.000"),
+                as.POSIXct("2024-04-03 03:00:00.000")
+)
+
+offsets <- compute_and_verify_offsets_alt(H17, start_times, end_times, 1.0006, 0.2, 0.0001, 0.02)
+H17_off <- H17
+H17_off[,2] <- H17[,2] + offsets[1]
+H17_off[,3] <- H17[,3] + offsets[2]
+H17_off[,4] <- H17[,4] + offsets[3]
+
+start_times <- c(as.POSIXct("2024-03-28 02:00:00.000"),
+                 as.POSIXct("2024-03-29 02:00:00.000"),
+                 as.POSIXct("2024-04-01 02:00:00.000"),
+                 as.POSIXct("2024-04-04 02:00:00.000")
+)
+end_times  <- c(as.POSIXct("2024-03-28 03:00:00.000"),
+                as.POSIXct("2024-03-29 03:00:00.000"),
+                as.POSIXct("2024-04-01 03:00:00.000"),
+                as.POSIXct("2024-04-04 03:00:00.000")
+)
+
+offsets <- compute_and_verify_offsets_alt(H18, start_times, end_times, 1.0006, 0.2, 0.0001, 0.02)
+H18_off <- H18
+H18_off[,2] <- H18[,2] + offsets[1]
+H18_off[,3] <- H18[,3] + offsets[2]
+H18_off[,4] <- H18[,4] + offsets[3]
+
+start_times <- c(as.POSIXct("2024-04-24 02:00:00.000"),
+                 as.POSIXct("2024-04-25 02:00:00.000"),
+                 as.POSIXct("2024-04-28 02:00:00.000"),
+                 as.POSIXct("2024-04-30 02:00:00.000")
+)
+end_times  <- c(as.POSIXct("2024-04-24 03:00:00.000"),
+                as.POSIXct("2024-04-25 03:00:00.000"),
+                as.POSIXct("2024-04-28 03:00:00.000"),
+                as.POSIXct("2024-04-30 03:00:00.000")
+)
+
+offsets <- compute_and_verify_offsets_alt(H19, start_times, end_times, 1.0006, 0.2, 0.0001, 0.02)
+H19_off <- H19
+H19_off[,2] <- H19[,2] + offsets[1]
+H19_off[,3] <- H19[,3] + offsets[2]
+H19_off[,4] <- H19[,4] + offsets[3]
+
+#Here vectors are also too close because of lack of options, but still very good output despite having two close vectors as input.
+
+start_times <- c(as.POSIXct("2024-10-11 02:00:00.000"),
+                 as.POSIXct("2024-10-12 11:00:00.000"),
+                 as.POSIXct("2024-10-13 02:00:00.000"),
+                 as.POSIXct("2024-10-12 02:00:00.000")
+)
+end_times  <- c(as.POSIXct("2024-10-11 03:00:00.000"),
+                as.POSIXct("2024-10-12 11:05:00.000"),
+                as.POSIXct("2024-10-13 03:00:00.000"),
+                as.POSIXct("2024-10-12 03:00:00.000")
+)
+
+offsets <- compute_and_verify_offsets_alt(A20, start_times, end_times, 1.0006, 0.2, 0.0001, 0.02)
+A20_off <- A20
+A20_off[,2] <- A20[,2] + offsets[1]
+A20_off[,3] <- A20[,3] + offsets[2]
+A20_off[,4] <- A20[,4] + offsets[3]
+
+start_times <- c(as.POSIXct("2024-11-22 02:00:00.000"),
+                 as.POSIXct("2024-11-25 02:00:00.000"),
+                 as.POSIXct("2024-11-23 02:00:00.000"),                 
+                 as.POSIXct("2024-11-21 02:00:00.000")
+)
+end_times  <- c(as.POSIXct("2024-11-22 03:00:00.000"),
+                as.POSIXct("2024-11-25 03:00:00.000"),
+                as.POSIXct("2024-11-23 03:00:00.000"),
+                as.POSIXct("2024-11-21 03:00:00.000")
+)
+
+offsets <- compute_and_verify_offsets_alt(A21, start_times, end_times, 1.0006, 0.2, 0.0001, 0.02)
+
+A21_off <- A21
+A21_off[,2] <- A21[,2] + offsets[1]
+A21_off[,3] <- A21[,3] + offsets[2]
+A21_off[,4] <- A21[,4] + offsets[3]
+```
+
+Now we compute the estimates for our examples.
+
+```{r}
+#Example 1
+vec1 <- c(0.004, 0.004, 1)
+vec2 <- c(0.004, 1, 0.004)
+vec3 <- c(1, 0.004, 0.004)
+vec4 <- c(0.584, 0.58, 0.576)
+
+#Example 2
+vec1 <- c(0, 0, 1)
+vec2 <- c(0, 1, 0)
+vec3 <- c(0, 0.708, 0.708)
+vec4 <- c(-10e-5, -0.708, -0.708)
+
+observations <- rbind(vec1, vec2, vec3, vec4)
+residuals <- function(offsets) {
+  x_offset <- offsets[1]
+  y_offset <- offsets[2]
+  z_offset <- offsets[3]
+  new_len <- offsets[4]
+  apply(observations, 1, function(row) {
+    x <- row[1]
+    y <- row[2]
+    z <- row[3]
+    sqrt((x + x_offset)^2 + (y + y_offset)^2 + (z + z_offset)^2) - new_len
+  })
+}
+initial_guess <- c(0, 0, 0, 1) 
+solution <- nleqslv(x = initial_guess, fn = residuals)
+solution$x
+```
+
+#Imports of the walking tests
+```{r}
+Walk1 <- read.gt3x("Data_raw/walk_test_1.gt3x")
+Walk1 <- as.data.frame(Walk1)
+Walk1$time <- force_tz(Walk1$time, tzone = "Europe/Berlin")
+Walk2 <- read.gt3x("Data_raw/walk_test_2.gt3x")
+Walk2 <- as.data.frame(Walk2)
+Walk2$time <- force_tz(Walk2$time, tzone = "Europe/Berlin")
+Walk3 <- read.gt3x("Data_raw/walk_test_3.gt3x")
+Walk3 <- as.data.frame(Walk3)
+Walk3$time <- force_tz(Walk3$time, tzone = "Europe/Berlin")
+```
+
+#Imports misc.
+```{r}
+Misc1 <- read.gt3x("Data_misc/M_son.gt3x")
+Misc1 <- as.data.frame(Misc1)
+Misc1$time <- force_tz(Misc1$time, tzone = "Europe/Berlin")
+Misc2 <- read.gt3x("Data_misc/P_daughter.gt3x")
+Misc2 <- as.data.frame(Misc2)
+Misc2$time <- force_tz(Misc2$time, tzone = "Europe/Berlin")
+```
+
+#Imports more misc.
+```{r}
+N_fatigue <- read.gt3x("Data_misc/N_fatigue_rotation.gt3x")
+N_fatigue <- as.data.frame(N_fatigue)
+N_fatigue$time <- force_tz(N_fatigue$time, tzone = "Europe/Berlin")
+N_video <- read.gt3x("Data_misc/N_video.gt3x")
+N_video <- as.data.frame(N_video)
+N_video$time <- force_tz(N_video$time, tzone = "Europe/Berlin")
+```

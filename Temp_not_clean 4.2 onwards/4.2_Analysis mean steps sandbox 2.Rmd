@@ -1,0 +1,172 @@
+### Importing libraries
+We first important the libraries we need.
+
+```{r, message=F, warning=F}
+#Data analysis
+library(tidyverse)
+library(patchwork)
+library(scales)
+library(RColorBrewer)
+
+#Working with the activity class and data files
+library(lubridate)
+library(read.gt3x)
+library(PhysicalActivity)
+
+#Solving equations
+library(nleqslv)
+library(pracma)
+library(latex2exp)
+
+#Reshaping / data manipulation
+library(reshape2)
+library(data.table)
+```
+
+Playing around with some steps, trying to see which metrics make sense. Do add the idea of more agressive filtering still!
+
+Test 1
+
+```{r}
+element <- "A20"
+all <- list()
+for(item in get(paste0(element, "_list"))){
+  all <- append(all, item)
+}
+element <- "A21"
+all <- list()
+for(item in get(paste0(element, "_list"))){
+  all <- append(all, item)
+}
+
+dataframes <- df_all_from_mvm(all, 250, max_vert, freq_selector, c(14,21))
+
+df1 <- dataframes[[1]]
+df2 <- dataframes[[2]]
+df3 <- dataframes[[3]]
+
+dataframes <- df_all_from_mvm_alt(all, 250, min_square_difference_vert, freq_selector, c(14,21))
+```
+
+```{r}
+random_rows <- sample(1:nrow(df1), 3)
+
+# Assign colors
+colors <- c("darkgreen", "forestgreen", "lightgreen",
+            "darkblue", "mediumblue", "lightblue",
+            "darkred", "red", "lightcoral")
+
+# Function to reshape data for plotting
+reshape_for_plot <- function(df, row_num, color) {
+  data.frame(index = 1:ncol(df), value = as.numeric(df[row_num, ]), group = color)
+}
+
+# Reshape the selected rows for plotting
+plot_data <- rbind(
+  reshape_for_plot(df1, random_rows[1], colors[1]),
+  reshape_for_plot(df2, random_rows[1], colors[2]),
+  reshape_for_plot(df3, random_rows[1], colors[3]),
+  reshape_for_plot(df1, random_rows[2], colors[4]),
+  reshape_for_plot(df2, random_rows[2], colors[5]),
+  reshape_for_plot(df3, random_rows[2], colors[6]),
+  reshape_for_plot(df1, random_rows[3], colors[7]),
+  reshape_for_plot(df2, random_rows[3], colors[8]),
+  reshape_for_plot(df3, random_rows[3], colors[9])
+)
+
+# Plot the lines
+ggplot(plot_data, aes(x = index, y = value, color = group, group = interaction(group, index))) +
+  geom_line(size = 1) +
+  scale_color_identity() +
+  theme_minimal()
+```
+Test 2
+
+```{r}
+all <- list(A20_list[[3]][[2]]) #Only taking the run
+dataframes_run <- df_all_from_mvm(all, 250, max_fw, freq_selector, c(5,25))
+df_test <- dataframes_run[[3]]
+```
+
+Plotting
+
+```{r}
+k <- 504
+df_test <- dataframes[[2]][k,]^2 + dataframes[[1]][k,]^2 + dataframes[[3]][k,]^2
+
+colnames(df_test) <- as.character(1:250)
+df_test$id <- 1:(nrow(df_test))
+df_test_melted = melt(df_test, id.vars = 'id')
+df_means <- aggregate(value ~ variable, data = df_test_melted, FUN = mean)
+df_test_melted$variable <- as.numeric(as.character(df_test_melted$variable))
+df_means$variable <- as.numeric(as.character(df_means$variable))
+
+ggplot(df_test_melted, aes(x = variable, y = value)) + 
+  geom_line(aes(group = id), color = "#D62728", linewidth = 0.05, alpha = 200/nrow(df_test)) +
+  geom_line(data = df_means, aes(x = variable, y = value, group = 1), 
+            color = "black", linewidth = 0.5) +
+  ylim(-0.6, 0.6) +
+  xlim(30, 70) +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )'),
+    title = paste0("Temp: vert person ", element)) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),      
+    axis.title = element_text(size = 14),   
+    axis.text = element_text(size = 14),      
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA)
+  )
+```
+
+Splitting into two categories
+
+```{r}
+df_test <- dataframes[[2]]
+colnames(df_test) <- as.character(1:250)
+df_test_start1 <- df_test[which(df_test$`50` > -0.1),]
+df_test_start2 <- df_test[which(df_test$`50` < -0.1),]
+
+#df_test_fw <- dataframes[[1]]
+#colnames(df_test_fw) <- as.character(1:250)
+#df_test_start1 <- df_test_fw[which(df_test$`165` > 0),]
+#df_test_start2 <- df_test_fw[which(df_test$`165` < 0),]
+
+df_test_start1$id <- 1:(nrow(df_test_start1))
+df_test_melted_start1 = melt(df_test_start1, id.vars = 'id')
+df_means_start1 <- aggregate(value ~ variable, data = df_test_melted_start1, FUN = mean)
+df_test_melted_start1$variable <- as.numeric(as.character(df_test_melted_start1$variable))
+df_means_start1$variable <- as.numeric(as.character(df_means_start1$variable))
+
+df_test_start2$id <- 1:(nrow(df_test_start2))
+df_test_melted_start2 = melt(df_test_start2, id.vars = 'id')
+df_means_start2 <- aggregate(value ~ variable, data = df_test_melted_start2, FUN = mean)
+df_test_melted_start2$variable <- as.numeric(as.character(df_test_melted_start2$variable))
+df_means_start2$variable <- as.numeric(as.character(df_means_start2$variable))
+
+ggplot() + 
+  geom_line(data = df_test_melted_start1, aes(x = variable, y = value, group = id), color = "#D62728", linewidth = 0.05, alpha = 200/nrow(df_test)) +
+  geom_line(data = df_test_melted_start2, aes(x = variable, y = value, group = id), color = "#56B4E9", linewidth = 0.05, alpha = 200/nrow(df_test)) +
+  geom_line(data = df_means_start1, aes(x = variable, y = value, group = 1), 
+            color = "black", linewidth = 0.5) +
+  ylim(-1, 0.8) +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )'),
+    title = paste0("Temp: vert person ", element)) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),      
+    axis.title = element_text(size = 14),   
+    axis.text = element_text(size = 14),      
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA)
+  )
+```
+

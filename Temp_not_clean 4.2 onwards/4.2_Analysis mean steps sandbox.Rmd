@@ -1,0 +1,738 @@
+### Importing libraries
+We first important the libraries we need.
+
+```{r, message=F, warning=F}
+#Data analysis
+library(tidyverse)
+library(patchwork)
+library(scales)
+library(RColorBrewer)
+
+#Working with the activity class and data files
+library(lubridate)
+library(read.gt3x)
+library(PhysicalActivity)
+
+#Solving equations
+library(nleqslv)
+library(pracma)
+library(latex2exp)
+
+#Reshaping / data manipulation
+library(reshape2)
+library(data.table)
+```
+
+Playing around with some steps, trying to see which metrics make sense
+
+```{r}
+seq_A20_1[[1]]$data %>% filter(in_step_bw == 1) %>% pull(acc_fw) %>% plot(type = 'l')
+seq_A20_1[[3]]$data %>% filter(in_step_fw == 2) %>% pull(acc_fw) %>% plot(type = 'l')
+
+seq_H10_2[[252]]$data %>% filter(in_step_bw == 1) %>% pull(acc_vert) %>% plot(type = 'l')
+seq_H10_2[[252]]$data %>% filter(in_step_fw == 1) %>% pull(acc_vert) %>% plot(type = 'l')
+
+seq_H12_2[[332]]$data %>% filter(in_step_bw == 1) %>% pull(acc_vert) %>% plot(type = 'l')
+seq_H12_2[[332]]$data %>% filter(in_step_bw == 2) %>% pull(acc_vert) %>% plot(type = 'l')
+
+#Finding some nice normal walking (?) to compare
+
+valid_idc <- c()
+for(j in 1:500){
+  if(seq_H12_2[[j]]$main_freq > 15 &
+     seq_H12_2[[j]]$main_freq < 25 &
+     seq_H12_2[[j]]$len > 300){
+    valid_idc <- append(valid_idc, j)
+  }
+}
+
+test_step <- filter(seq_A20_1[[1]]$data, in_step_fw == 1)
+```
+
+```{r}
+fw_vert_side_A20 <- average_step(c(seq_A20_1, seq_A20_2, seq_A20_3, seq_A20_4, seq_A20_5, seq_A20_6, seq_A20_7, seq_A20_8, seq_A20_9), 
+                                 200, freq_selector, c(14,21))
+plot(fw_vert_side_A20[[1]], type = 'l')
+# summ <- 0
+# test_seq <- seq_A20_5
+# for(j in 1:length(test_seq)){
+#   if(test_seq[[j]]$movement_type == "Walk"){
+#     summ <- summ + test_seq[[j]]$data %>% nrow()
+#   }
+# }
+# summ
+```
+
+```{r}
+fw_vert_side_A21 <- average_step(c(seq_A21_1, seq_A21_2, seq_A21_3, seq_A21_4, seq_A21_5, seq_A21_6), 
+                                 200, freq_selector, c(14,21))
+plot(fw_vert_side_A21[[1]], type = 'l')
+```
+
+```{r}
+fw_vert_side_H10 <- average_step(c(seq_H10_1, seq_H10_2, seq_H10_3, seq_H10_4, seq_H10_5, seq_H10_7, seq_H10_8), 
+                                 200, freq_selector, c(14,21))
+plot(fw_vert_side_H10[[1]], type = 'l')
+```
+
+```{r}
+for(element in c("S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", 
+                 "H10", "H11", "H12", "H13", "H14", "H15", "H16", "H17", "H18", "H19",
+                 "A20", "A21")){
+  all <- list()
+  for(item in get(paste0(element, "_list"))){
+    all <- append(all, item)
+    }
+  
+  assign(paste0("fw_vert_side_", element), average_step(all, 200, freq_selector, c(14,21)))
+}
+
+fw_vert_side_H17[[4]] #All except 17 min length of at least 1000 steps
+```
+
+We now do it again, but with the alternative method of averaging steps.
+
+```{r}
+for(element in c("S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", 
+                 "H10", "H11", "H12", "H13", "H14", "H15", "H16", "H17", "H18", "H19",
+                 "A20", "A21")){
+  all <- list()
+  for(item in get(paste0(element, "_list"))){
+    all <- append(all, item)
+  }
+  
+  assign(paste0("fw_vert_side_", element), average_step_from_mvm(all, 250, freq_selector, c(14,21)))
+}
+```
+
+We now save all the images through a loop.
+
+```{r}
+for(element in c("S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", 
+                 "H10", "H11", "H12", "H13", "H14", "H15", "H16", "H17", "H18", "H19",
+                 "A20", "A21")){
+  
+  assign(paste0("temp_df_", element), data.frame(row = 1:length(get(paste0("fw_vert_side_", element))[[1]]), 
+                                               fw = get(paste0("fw_vert_side_", element))[[1]],
+                                               vert = get(paste0("fw_vert_side_", element))[[2]],
+                                               side = get(paste0("fw_vert_side_", element))[[3]])
+         )
+  
+  plot1 <- ggplot(get(paste0("temp_df_", element)), aes(x = row, y = fw)) + 
+  geom_line(color = "#56B4E9", linewidth = 0.9) +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )'),
+    title = paste0("Temp: fw person ", element)) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),      
+    axis.title = element_text(size = 14),   
+    axis.text = element_text(size = 14),      
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA)
+  )
+  plot2 <- ggplot(get(paste0("temp_df_", element)), aes(x = row, y = vert)) + 
+  geom_line(color = "#D62728", linewidth = 0.9) +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )'),
+    title = paste0("Temp: vert person ", element)) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),      
+    axis.title = element_text(size = 14),   
+    axis.text = element_text(size = 14),      
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA)
+  )
+  plot3 <- ggplot(get(paste0("temp_df_", element)), aes(x = row, y = side)) + 
+  geom_line(color = "#FFCC33", linewidth = 0.9) +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )'),
+    title = paste0("Temp: side person ", element)) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),      
+    axis.title = element_text(size = 14),   
+    axis.text = element_text(size = 14),      
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA)
+  )
+    plot4 <- ggplot(get(paste0("temp_df_", element)), aes(x = row)) + 
+  geom_line(aes(y = fw, color = "fw"), linewidth = 0.9) +
+  geom_line(aes(y = vert, color = "vert"), linewidth = 0.9) +
+  geom_line(aes(y = side, color = "side"), linewidth = 0.9) +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )'),
+    title = paste0("Temp: combined person ", element)) +
+      scale_color_manual(
+        name = "",
+        values = c("fw" = "#56B4E9", "vert" = "#D62728", "side" = "#FFCC33")
+        ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),      
+    axis.title = element_text(size = 14),   
+    axis.text = element_text(size = 14),      
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA)
+  )
+  
+  ggsave(paste0("avg_fw_", element,".png"), plot1, width = 10, height = 4, dpi = 600)
+  ggsave(paste0("avg_vert_", element,".png"), plot2, width = 10, height = 4, dpi = 600)
+  ggsave(paste0("avg_side_", element,".png"), plot3, width = 10, height = 4, dpi = 600)
+  ggsave(paste0("avg_comb_", element,".png"), plot4, width = 10, height = 4, dpi = 600)
+}
+```
+
+###Misc. data/figures
+
+```{r}
+fw_vert_side_silly1 <- average_step_from_mvm(list(seq_silly[[1]], seq_silly[[2]], seq_silly[[3]], seq_silly[[4]]), 250, default, 0)
+fw_vert_side_silly5 <- average_step_from_mvm(list(seq_silly[[5]], seq_silly[[6]], seq_silly[[7]]), 250, default, 0)
+fw_vert_side_silly6 <- average_step_from_mvm(list(seq_silly[[8]], seq_silly[[9]]), 250, default, 0)
+
+#fw_vert_side_misc1_1 <- average_step_from_mvm(seq_misc1_1, 250, freq_selector, c(14,21))
+#fw_vert_side_misc1_2 <- average_step_from_mvm(seq_misc1_2, 250, freq_selector, c(14,21))
+fw_vert_side_misc2_1 <- average_step_from_mvm(seq_misc2_1, 250, freq_selector, c(14,21))
+fw_vert_side_misc2_2 <- average_step_from_mvm(seq_misc2_2, 250, freq_selector, c(14,21))
+```
+
+```{r}
+for(element in c("silly1", "silly5", "silly6", "misc2_1", "misc2_2")){
+  
+  assign(paste0("temp_df_", element), data.frame(row = 1:length(get(paste0("fw_vert_side_", element))[[1]]), 
+                                               fw = get(paste0("fw_vert_side_", element))[[1]],
+                                               vert = get(paste0("fw_vert_side_", element))[[2]],
+                                               side = get(paste0("fw_vert_side_", element))[[3]])
+         )
+  
+  plot1 <- ggplot(get(paste0("temp_df_", element)), aes(x = row, y = fw)) + 
+  geom_line(color = "#56B4E9", linewidth = 0.9) +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )'),
+    title = paste0("Temp: fw person ", element)) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),      
+    axis.title = element_text(size = 14),   
+    axis.text = element_text(size = 14),      
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA)
+  )
+  plot2 <- ggplot(get(paste0("temp_df_", element)), aes(x = row, y = vert)) + 
+  geom_line(color = "#D62728", linewidth = 0.9) +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )'),
+    title = paste0("Temp: vert person ", element)) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),      
+    axis.title = element_text(size = 14),   
+    axis.text = element_text(size = 14),      
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA)
+  )
+  plot3 <- ggplot(get(paste0("temp_df_", element)), aes(x = row, y = side)) + 
+  geom_line(color = "#FFCC33", linewidth = 0.9) +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )'),
+    title = paste0("Temp: side person ", element)) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),      
+    axis.title = element_text(size = 14),   
+    axis.text = element_text(size = 14),      
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA)
+  )
+    plot4 <- ggplot(get(paste0("temp_df_", element)), aes(x = row)) + 
+  geom_line(aes(y = fw, color = "fw"), linewidth = 0.9) +
+  geom_line(aes(y = vert, color = "vert"), linewidth = 0.9) +
+  geom_line(aes(y = side, color = "side"), linewidth = 0.9) +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )'),
+    title = paste0("Temp: combined person ", element)) +
+      scale_color_manual(
+        name = "",
+        values = c("fw" = "#56B4E9", "vert" = "#D62728", "side" = "#FFCC33")
+        ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),      
+    axis.title = element_text(size = 14),   
+    axis.text = element_text(size = 14),      
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA)
+  )
+  
+  ggsave(paste0("avg_fw_", element,".png"), plot1, width = 10, height = 4, dpi = 600)
+  ggsave(paste0("avg_vert_", element,".png"), plot2, width = 10, height = 4, dpi = 600)
+  ggsave(paste0("avg_side_", element,".png"), plot3, width = 10, height = 4, dpi = 600)
+  ggsave(paste0("avg_comb_", element,".png"), plot4, width = 10, height = 4, dpi = 600)
+}
+```
+
+Looks weird. Lack of data?
+
+```{r}
+fw_vert_side_misc2_1[[4]] #216 steps
+fw_vert_side_misc2_2[[4]] #404 steps
+```
+
+### Moving away from the mean
+
+We will now continue with our analysis by considering things more complex than the mean. First check if they give the same result.
+
+```{r}
+element <- "A20"
+all <- list()
+for(item in get(paste0(element, "_list"))){
+  all <- append(all, item)
+}
+
+df_test <- df_vert_from_mvm(all, 250, freq_selector, c(14,21))
+colnames(df_test) <- as.character(1:250)
+
+colMeans(df_test) %>% plot(type = 'l')
+fw_vert_side_A20[[2]] %>% plot(type = 'l')
+```
+
+Now try to see if we can get nice plots from this dataframe (maybe do not want to store all dataframes, so define a dataframe and then overwrite it to make the next figures or something).
+
+1. Ribbon with some sort of deviation
+
+```{r}
+summary_df <- data.frame(
+  time = 1:250,
+  mean = colMeans(df_test),
+  sd = apply(df_test, 2, sd)
+)
+ggplot(summary_df, aes(x = time)) + 
+  geom_line(aes(y = mean), color = "#D62728", linewidth = 0.9) +
+  geom_ribbon(aes(ymin = mean - sd, ymax = mean + sd), fill = "#D62728", alpha = 0.2) +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )'),
+    title = paste0("Temp: fw person ", element)) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),      
+    axis.title = element_text(size = 14),   
+    axis.text = element_text(size = 14),      
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA)
+  )
+```
+
+2. Quantiles (similar, but not with standard deviation but actual number of values... right?)
+
+```{r}
+summary_df <- data.frame(
+  time = 1:250,
+  mean = colMeans(df_test),
+  quant20 = colQuantile(df_test, frac = 0.2),
+  quant40 = colQuantile(df_test, frac = 0.4),
+  quant50 = colQuantile(df_test, frac = 0.5),
+  quant60 = colQuantile(df_test, frac = 0.6),
+  quant80 = colQuantile(df_test, frac = 0.8)
+)
+```
+
+3. Densities
+
+```{r}
+df_long <- transpose(df_test)  # Transpose so each row is a time step
+colnames(df_long) <- as.character(1:ncol(df_long))
+df_long$step <- 1:nrow(df_long)  # Add time variable
+df_long <- pivot_longer(df_long, cols = -step, names_to = "time", values_to = "acceleration")
+df_long$time <- as.numeric(df_long$time)
+
+# 2D density plot (hexbin alternative)
+ggplot(df_long, aes(x = time, y = acceleration)) +
+  geom_bin2d(bins = 70) +
+  scale_fill_continuous(type = "gradient") +
+  theme_bw()
+
+
+ggplot(df_long, aes(x=time, y=acceleration) ) +
+  geom_density_2d()
+```
+
+4. All lines with low alpha
+
+```{r}
+df_test$id <- 1:(nrow(df_test))
+df_test_melted = melt(df_test, id.vars = 'id')
+df_means <- aggregate(value ~ variable, data = df_test_melted, FUN = mean)
+
+df_test_melted$variable <- as.numeric(as.character(df_test_melted$variable))
+df_means$variable <- as.numeric(as.character(df_means$variable))
+
+ggplot(df_test_melted, aes(x = variable, y = value)) + 
+  geom_line(aes(group = id), color = "#D62728", linewidth = 0.05, alpha = 0.02) +
+  geom_line(data = df_means, aes(x = variable, y = value, group = 1), 
+            color = "black", linewidth = 0.5) +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )'),
+    title = paste0("Temp: fw person ", element)) +
+  ylim(-1, 0.9) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),      
+    axis.title = element_text(size = 14),   
+    axis.text = element_text(size = 14),      
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA)
+  )
+```
+
+5. Figuring out why A20 (and A21) seem to contain two different movements
+
+```{r}
+which(df_test$`50` > 0.75)
+
+data <- all
+n <- 250
+filter_function <- freq_selector
+filter_par <- c(14,21)
+
+  all_steps <- list()
+  added_steps <- 0
+  
+  for(mvm in data){
+    mvm_steps <- list()
+    
+    if(mvm$movement_type == "Walk" & filter_function(mvm, filter_par)){
+      
+      end_bw <- max(mvm$data$in_step_bw)
+      end_fw <- max(mvm$data$in_step_fw)
+      
+      for(j in 1:end_bw){
+        step <- filter(mvm$data, in_step_bw == j)
+        new_vert <- rescale(step$acc_vert, n)
+        
+        mvm_steps <- append(mvm_steps, list(new_vert))
+        added_steps <- added_steps + 1
+        if(added_steps == 3326){
+          print(mvm$data$time[1])
+        }
+        if(added_steps == 3361){
+          print(mvm$data$time[1])
+        }
+      }
+      
+      for(j in 1:end_fw){
+        step <- filter(mvm$data, in_step_fw == j)
+        new_vert <- rescale(step$acc_vert, n)
+        
+        mvm_steps <- append(mvm_steps, list(new_vert))
+        added_steps <- added_steps + 1
+        
+        if(added_steps == 3326){
+          print(mvm$data$time[1])
+        }
+        if(added_steps == 3361){
+          print(mvm$data$time[1])
+        }
+      }
+      
+      mvm_vert_avg <- numeric(n)
+    }
+    
+    if(length(mvm_steps) > 0){
+      for(j in 1:length(mvm_steps)){
+        mvm_vert_avg <- mvm_vert_avg + mvm_steps[[j]]
+      }
+      min_index <- which.min(mvm_vert_avg)
+      #Now we cycle every rescaled step in mvm_steps individually and add them to the df
+      for(step in mvm_steps){
+        if(min_index != 1){
+          step <-  c(step[min_index:n], step[1:(min_index-1)])
+          all_steps <- append(all_steps, list(step))
+        }
+      }
+    }
+  }
+```
+
+Testing down, we now make the figures that we are happy with for all:
+
+```{r}
+for(element in c("S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", 
+                 "H10", "H11", "H12", "H13", "H14", "H15", "H16", "H17", "H18", "H19",
+                 "A20", "A21")){
+  all <- list()
+  for(item in get(paste0(element, "_list"))){
+    all <- append(all, item)
+    }
+  
+  df_test <- df_vert_from_mvm(all, 250, filter_function, c(14,21))
+  colnames(df_test) <- as.character(1:250)
+  
+df_test$id <- 1:(nrow(df_test))
+df_test_melted = melt(df_test, id.vars = 'id')
+df_means <- aggregate(value ~ variable, data = df_test_melted, FUN = mean)
+
+df_test_melted$variable <- as.numeric(as.character(df_test_melted$variable))
+df_means$variable <- as.numeric(as.character(df_means$variable))
+
+plot <- ggplot(df_test_melted, aes(x = variable, y = value)) + 
+  geom_line(aes(group = id), color = "#D62728", linewidth = 0.05, alpha = 200/nrow(df_test)) +
+  geom_line(data = df_means, aes(x = variable, y = value, group = 1), 
+            color = "black", linewidth = 0.5) +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )'),
+    title = paste0("Temp: vert person ", element)) +
+  ylim(-1, 0.9) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),      
+    axis.title = element_text(size = 14),   
+    axis.text = element_text(size = 14),      
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA)
+  )
+
+  ggsave(paste0("distr_vert_", element,".png"), plot, width = 10, height = 4, dpi = 600)
+}
+
+df_silly1 <- df_vert_from_mvm(list(seq_silly[[1]], seq_silly[[2]], seq_silly[[3]], seq_silly[[4]]), 250, default, 0)
+df_silly5 <- df_vert_from_mvm(list(seq_silly[[5]], seq_silly[[6]], seq_silly[[7]]), 250, default, 0)
+df_silly6 <- df_vert_from_mvm(list(seq_silly[[8]], seq_silly[[9]]), 250, default, 0)
+df_misc2_1 <- df_vert_from_mvm(seq_misc2_1, 250, freq_selector, c(14,21))
+df_misc2_2 <- df_vert_from_mvm(seq_misc2_2, 250, freq_selector, c(14,21))
+
+for(element in c("silly1", "silly5", "silly6", "misc2_1", "misc2_2")){
+  
+  df_test <- get(paste0("df_", element))
+  colnames(df_test) <- as.character(1:250)
+  
+  df_test$id <- 1:(nrow(df_test))
+df_test_melted = melt(df_test, id.vars = 'id')
+df_means <- aggregate(value ~ variable, data = df_test_melted, FUN = mean)
+
+df_test_melted$variable <- as.numeric(as.character(df_test_melted$variable))
+df_means$variable <- as.numeric(as.character(df_means$variable))
+
+plot <- ggplot(df_test_melted, aes(x = variable, y = value)) + 
+  geom_line(aes(group = id), color = "#D62728", linewidth = 0.05, alpha = 200/nrow(df_test)) +
+  geom_line(data = df_means, aes(x = variable, y = value, group = 1), 
+            color = "black", linewidth = 0.5) +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )'),
+    title = paste0("Temp: vert person ", element)) +
+  ylim(-1, 0.9) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),      
+    axis.title = element_text(size = 14),   
+    axis.text = element_text(size = 14),      
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA)
+  )
+
+  ggsave(paste0("distr_vert_", element,".png"), plot, width = 10, height = 4, dpi = 600)
+}
+```
+
+```{r}
+for(element in c("S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", 
+                 "H10", "H11", "H12", "H13", "H14", "H15", "H16", "H17", "H18", "H19",
+                 "A20", "A21")){
+  all <- list()
+  for(item in get(paste0(element, "_list"))){
+    all <- append(all, item)
+    }
+  
+  df_test <- df_fw_from_mvm(all, 250, filter_function, c(14,21))
+  colnames(df_test) <- as.character(1:250)
+  
+df_test$id <- 1:(nrow(df_test))
+df_test_melted = melt(df_test, id.vars = 'id')
+df_means <- aggregate(value ~ variable, data = df_test_melted, FUN = mean)
+
+df_test_melted$variable <- as.numeric(as.character(df_test_melted$variable))
+df_means$variable <- as.numeric(as.character(df_means$variable))
+
+plot <- ggplot(df_test_melted, aes(x = variable, y = value)) + 
+  geom_line(aes(group = id), color = "#56B4E9", linewidth = 0.05, alpha = 300/nrow(df_test)) +
+  geom_line(data = df_means, aes(x = variable, y = value, group = 1), 
+            color = "black", linewidth = 0.5) +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )'),
+    title = paste0("Temp: fw person ", element)) +
+  ylim(-0.5, 0.5) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),      
+    axis.title = element_text(size = 14),   
+    axis.text = element_text(size = 14),      
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA)
+  )
+
+  ggsave(paste0("distr_fw_", element,".png"), plot, width = 10, height = 4, dpi = 600)
+}
+
+df_silly1 <- df_fw_from_mvm(list(seq_silly[[1]], seq_silly[[2]], seq_silly[[3]], seq_silly[[4]]), 250, default, 0)
+df_silly5 <- df_fw_from_mvm(list(seq_silly[[5]], seq_silly[[6]], seq_silly[[7]]), 250, default, 0)
+df_silly6 <- df_fw_from_mvm(list(seq_silly[[8]], seq_silly[[9]]), 250, default, 0)
+df_misc2_1 <- df_fw_from_mvm(seq_misc2_1, 250, freq_selector, c(14,21))
+df_misc2_2 <- df_fw_from_mvm(seq_misc2_2, 250, freq_selector, c(14,21))
+
+for(element in c("silly1", "silly5", "silly6", "misc2_1", "misc2_2")){
+  
+  df_test <- get(paste0("df_", element))
+  colnames(df_test) <- as.character(1:250)
+  
+  df_test$id <- 1:(nrow(df_test))
+df_test_melted = melt(df_test, id.vars = 'id')
+df_means <- aggregate(value ~ variable, data = df_test_melted, FUN = mean)
+
+df_test_melted$variable <- as.numeric(as.character(df_test_melted$variable))
+df_means$variable <- as.numeric(as.character(df_means$variable))
+
+plot <- ggplot(df_test_melted, aes(x = variable, y = value)) + 
+  geom_line(aes(group = id), color = "#56B4E9", linewidth = 0.05, alpha = 300/nrow(df_test)) +
+  geom_line(data = df_means, aes(x = variable, y = value, group = 1), 
+            color = "black", linewidth = 0.5) +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )'),
+    title = paste0("Temp: fw person ", element)) +
+  ylim(-0.5, 0.5) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),      
+    axis.title = element_text(size = 14),   
+    axis.text = element_text(size = 14),      
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA)
+  )
+
+  ggsave(paste0("distr_fw_", element,".png"), plot, width = 10, height = 4, dpi = 600)
+}
+```
+
+```{r}
+for(element in c("S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9", 
+                 "H10", "H11", "H12", "H13", "H14", "H15", "H16", "H17", "H18", "H19",
+                 "A20", "A21")){
+  all <- list()
+  for(item in get(paste0(element, "_list"))){
+    all <- append(all, item)
+    }
+  df_test <- df_side_from_mvm(all, 250, filter_function, c(14,21))
+  colnames(df_test) <- as.character(1:250)
+  
+  df_test$id <- 1:(nrow(df_test))
+df_test_melted = melt(df_test, id.vars = 'id')
+df_means <- aggregate(value ~ variable, data = df_test_melted, FUN = mean)
+
+df_test_melted$variable <- as.numeric(as.character(df_test_melted$variable))
+df_means$variable <- as.numeric(as.character(df_means$variable))
+
+plot <- ggplot(df_test_melted, aes(x = variable, y = value)) + 
+  geom_line(aes(group = id), color = "#FFCC33", linewidth = 0.05, alpha = 300/nrow(df_test)) +
+  geom_line(data = df_means, aes(x = variable, y = value, group = 1), 
+            color = "black", linewidth = 0.5) +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )'),
+    title = paste0("Temp: side person ", element)) +
+  ylim(-0.25, 0.25) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),      
+    axis.title = element_text(size = 14),   
+    axis.text = element_text(size = 14),      
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA)
+  )
+
+  ggsave(paste0("distr_side_", element,".png"), plot, width = 10, height = 4, dpi = 600)
+}
+
+df_silly1 <- df_side_from_mvm(list(seq_silly[[1]], seq_silly[[2]], seq_silly[[3]], seq_silly[[4]]), 250, default, 0)
+df_silly5 <- df_side_from_mvm(list(seq_silly[[5]], seq_silly[[6]], seq_silly[[7]]), 250, default, 0)
+df_silly6 <- df_side_from_mvm(list(seq_silly[[8]], seq_silly[[9]]), 250, default, 0)
+df_misc2_1 <- df_side_from_mvm(seq_misc2_1, 250, freq_selector, c(14,21))
+df_misc2_2 <- df_side_from_mvm(seq_misc2_2, 250, freq_selector, c(14,21))
+
+for(element in c("silly1", "silly5", "silly6", "misc2_1", "misc2_2")){
+  
+  df_test <- get(paste0("df_", element))
+  colnames(df_test) <- as.character(1:250)
+  
+  df_test$id <- 1:(nrow(df_test))
+df_test_melted = melt(df_test, id.vars = 'id')
+df_means <- aggregate(value ~ variable, data = df_test_melted, FUN = mean)
+
+df_test_melted$variable <- as.numeric(as.character(df_test_melted$variable))
+df_means$variable <- as.numeric(as.character(df_means$variable))
+
+plot <- ggplot(df_test_melted, aes(x = variable, y = value)) + 
+  geom_line(aes(group = id), color = "#FFCC33", linewidth = 0.05, alpha = 300/nrow(df_test)) +
+  geom_line(data = df_means, aes(x = variable, y = value, group = 1), 
+            color = "black", linewidth = 0.5) +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )'),
+    title = paste0("Temp: side person ", element)) +
+  ylim(-0.3, 0.3) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),      
+    axis.title = element_text(size = 14),   
+    axis.text = element_text(size = 14),      
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA)
+  )
+
+  ggsave(paste0("distr_side_", element,".png"), plot, width = 10, height = 4, dpi = 600)
+}
+```

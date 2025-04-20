@@ -1,0 +1,1221 @@
+### Importing libraries
+We first import the libraries we need.
+
+```{r, message=F, warning=F}
+#Data analysis
+library(tidyverse)
+library(patchwork)
+library(scales)
+library(RColorBrewer)
+library(latex2exp)
+
+#Working with the activity class and data files
+library(lubridate)
+library(read.gt3x)
+library(PhysicalActivity)
+
+#Solving equations
+library(nleqslv)
+library(pracma)
+```
+
+### Extraction algorithm
+
+```{r}
+extraction_algorithm <- function(df, big_wdw_size, no_ma_vertical_data, no_ma_fourier_components, kernel_fourier_components, upright_acceleration_thresh, absolute_acceleration_thresh, absolute_freq_thresh, relative_freq_thresh, min_step_period, max_step_period, periodicity_length_deviation, periodicity_length_deviation_double, periodicity_thresh, periodicity_initial_thresh, direction_thresh, ...){
+  
+  sequence_list <- list()
+  df_new <- Big_window_manipulation(df, big_wdw_size, no_ma_vertical_data, no_ma_fourier_components, upright_acceleration_thresh, absolute_acceleration_thresh, kernel_fourier_components, ...)
+  
+  ordering <- order(df_new$relative_frac, decreasing = TRUE)
+  sequence_num <- 0
+  
+  for(j in ordering){
+    if(Potential_sequence(df_new, j, absolute_freq_thresh, relative_freq_thresh, min_step_period, max_step_period)){
+      sequence_list_and_num <- Sequence_constructor(sequence_list, sequence_num, df_new, j, periodicity_length_deviation, periodicity_length_deviation_double, periodicity_thresh, periodicity_initial_thresh)
+      df_new <- sequence_list_and_num[[1]]
+      sequence_list <- sequence_list_and_num[[2]]
+      sequence_num <- sequence_list_and_num[[3]]
+    }
+    else if(df_new$relative_frac[j] <= relative_freq_thresh){
+      break
+    }
+  }
+  
+  if(length(sequence_list) > 0){
+    sequence_list <- Rotate_and_classify(sequence_list, direction_thresh) #Cannot rotate / loop over elements of empty list
+  }
+  #return(df_new) #Only for testing
+  return(sequence_list)
+  
+}
+
+fast_extraction_algorithm <- function(df, big_wdw_size, no_ma_vertical_data, no_ma_fourier_components, kernel_fourier_components, upright_acceleration_thresh, absolute_acceleration_thresh, absolute_freq_thresh, relative_freq_thresh, min_step_period, max_step_period, periodicity_length_deviation, periodicity_length_deviation_double, periodicity_thresh, periodicity_initial_thresh, direction_thresh, ...){
+  
+  sequence_list <- list()
+  df_new <- Fast_big_window_manipulation(df, big_wdw_size, no_ma_vertical_data, no_ma_fourier_components, upright_acceleration_thresh, absolute_acceleration_thresh, kernel_fourier_components, ...)
+  
+  ordering <- order(df_new$relative_frac, decreasing = TRUE)
+  sequence_num <- 0
+  
+  for(j in ordering){
+    if(Potential_sequence(df_new, j, absolute_freq_thresh, relative_freq_thresh, min_step_period, max_step_period)){
+      sequence_list_and_num <- Sequence_constructor(sequence_list, sequence_num, df_new, j, periodicity_length_deviation, periodicity_length_deviation_double, periodicity_thresh, periodicity_initial_thresh)
+      df_new <- sequence_list_and_num[[1]]
+      sequence_list <- sequence_list_and_num[[2]]
+      sequence_num <- sequence_list_and_num[[3]]
+    }
+    else if(df_new$relative_frac[j] <= relative_freq_thresh){
+      break
+    }
+  }
+  
+  if(length(sequence_list) > 0){
+    sequence_list <- Rotate_and_classify(sequence_list, direction_thresh) #Cannot rotate / loop over elements of empty list
+  }
+  #return(df_new) #Only for testing
+  return(sequence_list)
+  
+}
+```
+
+### Usage
+
+Walking tests
+
+```{r}
+start_time <- as.POSIXct("2025-01-20 10:31:00.000")
+end_time <- as.POSIXct("2025-01-20 10:38:00.000")
+df_walk_1 <- filter(Walk1, time > start_time & time < end_time)
+start_time <- as.POSIXct("2025-01-20 10:49:30.000")
+end_time <- as.POSIXct("2025-01-20 10:56:30.000")
+df_walk_2 <- filter(Walk1, time > start_time & time < end_time)
+start_time <- as.POSIXct("2025-01-20 11:38:00.000")
+end_time <- as.POSIXct("2025-01-20 11:45:00.000")
+df_walk_3 <- filter(Walk1, time > start_time & time < end_time)
+start_time <- as.POSIXct("2025-01-20 14:18:00.000")
+end_time <- as.POSIXct("2025-01-20 14:25:00.000")
+df_walk_4 <- filter(Walk2, time > start_time & time < end_time)
+start_time <- as.POSIXct("2025-01-20 15:00:00.000")
+end_time <- as.POSIXct("2025-01-20 15:07:00.000")
+df_walk_5 <- filter(Walk2, time > start_time & time < end_time)
+start_time <- as.POSIXct("2025-01-20 15:37:30.000")
+end_time <- as.POSIXct("2025-01-20 15:44:30.000")
+df_walk_6 <- filter(Walk2, time > start_time & time < end_time)
+start_time <- as.POSIXct("2025-02-17 10:44:00.000")
+end_time <- as.POSIXct("2025-02-17 10:53:00.000")
+df_walk_7 <- filter(Walk3, time > start_time & time < end_time)
+start_time <- as.POSIXct("2025-02-17 11:14:00.000")
+end_time <- as.POSIXct("2025-02-17 11:23:00.000")
+df_walk_8 <- filter(Walk3, time > start_time & time < end_time)
+start_time <- as.POSIXct("2025-02-17 11:46:00.000")
+end_time <- as.POSIXct("2025-02-17 11:55:00.000")
+df_walk_9 <- filter(Walk3, time > start_time & time < end_time)
+start_time <- as.POSIXct("2025-02-17 13:36:00.000")
+end_time <- as.POSIXct("2025-02-17 13:47:00.000")
+df_walk_10 <- filter(Walk3, time > start_time & time < end_time)
+```
+
+Individual S1
+
+```{r}
+start_time <- as.POSIXct("2022-11-05 06:00:00.000")
+end_time <- as.POSIXct("2022-11-05 22:00:00.000")
+df_S1_1 <- filter(S1_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2022-11-06 06:00:00.000")
+end_time <- as.POSIXct("2022-11-06 22:00:00.000")
+df_S1_2 <- filter(S1_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2022-11-07 06:00:00.000")
+end_time <- as.POSIXct("2022-11-07 22:00:00.000")
+df_S1_3 <- filter(S1_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2022-11-08 06:00:00.000")
+end_time <- as.POSIXct("2022-11-08 22:00:00.000")
+df_S1_4 <- filter(S1_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2022-11-09 06:00:00.000")
+end_time <- as.POSIXct("2022-11-09 22:00:00.000")
+df_S1_5 <- filter(S1_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2022-11-10 06:00:00.000")
+end_time <- as.POSIXct("2022-11-10 22:00:00.000")
+df_S1_6 <- filter(S1_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2022-11-11 06:00:00.000")
+end_time <- as.POSIXct("2022-11-11 22:00:00.000")
+df_S1_7 <- filter(S1_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2022-11-12 06:00:00.000")
+end_time <- as.POSIXct("2022-11-12 22:00:00.000")
+df_S1_8 <- filter(S1_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2022-11-13 06:00:00.000")
+end_time <- as.POSIXct("2022-11-13 22:00:00.000")
+df_S1_9 <- filter(S1_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2022-11-14 06:00:00.000")
+end_time <- as.POSIXct("2022-11-14 22:00:00.000")
+df_S1_10 <- filter(S1_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2022-11-15 06:00:00.000")
+end_time <- as.POSIXct("2022-11-15 22:00:00.000")
+df_S1_11 <- filter(S1_off, time > start_time & time < end_time)
+```
+
+Individual S2
+
+```{r}
+start_time <- as.POSIXct("2023-05-26 06:00:00.000")
+end_time <- as.POSIXct("2023-05-26 22:00:00.000")
+df_S2_1 <- filter(S2_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-05-27 06:00:00.000")
+end_time <- as.POSIXct("2023-05-27 22:00:00.000")
+df_S2_2 <- filter(S2_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-05-28 06:00:00.000")
+end_time <- as.POSIXct("2023-05-28 22:00:00.000")
+df_S2_3 <- filter(S2_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-05-29 06:00:00.000")
+end_time <- as.POSIXct("2023-05-29 22:00:00.000")
+df_S2_4 <- filter(S2_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-05-30 06:00:00.000")
+end_time <- as.POSIXct("2023-05-30 22:00:00.000")
+df_S2_5 <- filter(S2_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-05-31 06:00:00.000")
+end_time <- as.POSIXct("2023-05-31 22:00:00.000")
+df_S2_6 <- filter(S2_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-06-01 06:00:00.000")
+end_time <- as.POSIXct("2023-06-01 22:00:00.000")
+df_S2_7 <- filter(S2_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-06-02 06:00:00.000")
+end_time <- as.POSIXct("2023-06-02 22:00:00.000")
+df_S2_8 <- filter(S2_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-06-03 06:00:00.000")
+end_time <- as.POSIXct("2023-06-03 22:00:00.000")
+df_S2_9 <- filter(S2_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-06-04 06:00:00.000")
+end_time <- as.POSIXct("2023-06-04 22:00:00.000")
+df_S2_10 <- filter(S2_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-06-05 06:00:00.000")
+end_time <- as.POSIXct("2023-06-05 22:00:00.000")
+df_S2_11 <- filter(S2_off, time > start_time & time < end_time)
+```
+
+Individual S3
+
+```{r}
+start_time <- as.POSIXct("2023-08-25 06:00:00.000")
+end_time <- as.POSIXct("2023-08-25 22:00:00.000")
+df_S3_1 <- filter(S3_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-08-26 06:00:00.000")
+end_time <- as.POSIXct("2023-08-26 22:00:00.000")
+df_S3_2 <- filter(S3_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-08-27 06:00:00.000")
+end_time <- as.POSIXct("2023-08-27 22:00:00.000")
+df_S3_3 <- filter(S3_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-08-28 06:00:00.000")
+end_time <- as.POSIXct("2023-08-28 22:00:00.000")
+df_S3_4 <- filter(S3_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-08-29 06:00:00.000")
+end_time <- as.POSIXct("2023-08-29 22:00:00.000")
+df_S3_5 <- filter(S3_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-08-30 06:00:00.000")
+end_time <- as.POSIXct("2023-08-30 22:00:00.000")
+df_S3_6 <- filter(S3_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-08-31 06:00:00.000")
+end_time <- as.POSIXct("2023-08-31 22:00:00.000")
+df_S3_7 <- filter(S3_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-09-01 06:00:00.000")
+end_time <- as.POSIXct("2023-09-01 22:00:00.000")
+df_S3_8 <- filter(S3_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-09-02 06:00:00.000")
+end_time <- as.POSIXct("2023-09-02 22:00:00.000")
+df_S3_9 <- filter(S3_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-09-03 06:00:00.000")
+end_time <- as.POSIXct("2023-09-03 22:00:00.000")
+df_S3_10 <- filter(S3_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-09-04 06:00:00.000")
+end_time <- as.POSIXct("2023-09-04 22:00:00.000")
+df_S3_11 <- filter(S3_off, time > start_time & time < end_time)
+```
+
+Individual S4
+
+```{r}
+start_time <- as.POSIXct("2023-04-08 06:00:00.000")
+end_time <- as.POSIXct("2023-04-08 22:00:00.000")
+df_S4_1 <- filter(S4_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-04-09 06:00:00.000")
+end_time <- as.POSIXct("2023-04-09 22:00:00.000")
+df_S4_2 <- filter(S4_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-04-10 06:00:00.000")
+end_time <- as.POSIXct("2023-04-10 22:00:00.000")
+df_S4_3 <- filter(S4_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-04-11 06:00:00.000")
+end_time <- as.POSIXct("2023-04-11 22:00:00.000")
+df_S4_4 <- filter(S4_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-04-12 06:00:00.000")
+end_time <- as.POSIXct("2023-04-12 22:00:00.000")
+df_S4_5 <- filter(S4_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-04-13 06:00:00.000")
+end_time <- as.POSIXct("2023-04-13 22:00:00.000")
+df_S4_6 <- filter(S4_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-04-14 06:00:00.000")
+end_time <- as.POSIXct("2023-04-14 22:00:00.000")
+df_S4_7 <- filter(S4_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-04-15 06:00:00.000")
+end_time <- as.POSIXct("2023-04-15 22:00:00.000")
+df_S4_8 <- filter(S4_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-04-16 06:00:00.000")
+end_time <- as.POSIXct("2023-04-16 22:00:00.000")
+df_S4_9 <- filter(S4_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-04-17 06:00:00.000")
+end_time <- as.POSIXct("2023-04-17 22:00:00.000")
+df_S4_10 <- filter(S4_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-04-18 06:00:00.000")
+end_time <- as.POSIXct("2023-04-18 22:00:00.000")
+df_S4_11 <- filter(S4_off, time > start_time & time < end_time)
+```
+
+Individual S5
+
+```{r}
+start_time <- as.POSIXct("2023-05-12 06:00:00.000")
+end_time <- as.POSIXct("2023-05-12 22:00:00.000")
+df_S5_1 <- filter(S5_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-05-13 06:00:00.000")
+end_time <- as.POSIXct("2023-05-13 22:00:00.000")
+df_S5_2 <- filter(S5_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-05-14 06:00:00.000")
+end_time <- as.POSIXct("2023-05-14 22:00:00.000")
+df_S5_3 <- filter(S5_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-05-15 06:00:00.000")
+end_time <- as.POSIXct("2023-05-15 22:00:00.000")
+df_S5_4 <- filter(S5_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-05-16 06:00:00.000")
+end_time <- as.POSIXct("2023-05-16 22:00:00.000")
+df_S5_5 <- filter(S5_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-05-17 06:00:00.000")
+end_time <- as.POSIXct("2023-05-17 22:00:00.000")
+df_S5_6 <- filter(S5_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-05-18 06:00:00.000")
+end_time <- as.POSIXct("2023-05-18 22:00:00.000")
+df_S5_7 <- filter(S5_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-05-19 06:00:00.000")
+end_time <- as.POSIXct("2023-05-19 22:00:00.000")
+df_S5_8 <- filter(S5_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-05-20 06:00:00.000")
+end_time <- as.POSIXct("2023-05-20 22:00:00.000")
+df_S5_9 <- filter(S5_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-05-21 06:00:00.000")
+end_time <- as.POSIXct("2023-05-21 22:00:00.000")
+df_S5_10 <- filter(S5_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-05-22 06:00:00.000")
+end_time <- as.POSIXct("2023-05-22 22:00:00.000")
+df_S5_11 <- filter(S5_off, time > start_time & time < end_time)
+```
+
+Individual S6
+
+```{r}
+start_time <- as.POSIXct("2023-03-24 06:00:00.000")
+end_time <- as.POSIXct("2023-03-24 22:00:00.000")
+df_S6_1 <- filter(S6_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-03-25 06:00:00.000")
+end_time <- as.POSIXct("2023-03-25 22:00:00.000")
+df_S6_2 <- filter(S6_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-03-26 06:00:00.000")
+end_time <- as.POSIXct("2023-03-26 22:00:00.000")
+df_S6_3 <- filter(S6_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-03-27 06:00:00.000")
+end_time <- as.POSIXct("2023-03-27 22:00:00.000")
+df_S6_4 <- filter(S6_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-03-28 06:00:00.000")
+end_time <- as.POSIXct("2023-03-28 22:00:00.000")
+df_S6_5 <- filter(S6_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-03-29 06:00:00.000")
+end_time <- as.POSIXct("2023-03-29 22:00:00.000")
+df_S6_6 <- filter(S6_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-03-30 06:00:00.000")
+end_time <- as.POSIXct("2023-03-30 22:00:00.000")
+df_S6_7 <- filter(S6_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-03-31 06:00:00.000")
+end_time <- as.POSIXct("2023-03-31 22:00:00.000")
+df_S6_8 <- filter(S6_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-04-01 06:00:00.000")
+end_time <- as.POSIXct("2023-04-01 22:00:00.000")
+df_S6_9 <- filter(S6_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-04-02 06:00:00.000")
+end_time <- as.POSIXct("2023-04-02 22:00:00.000")
+df_S6_10 <- filter(S6_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-04-03 06:00:00.000")
+end_time <- as.POSIXct("2023-04-03 22:00:00.000")
+df_S6_11 <- filter(S6_off, time > start_time & time < end_time)
+```
+
+Individual S7
+
+```{r}
+start_time <- as.POSIXct("2023-03-24 06:00:00.000")
+end_time <- as.POSIXct("2023-03-24 22:00:00.000")
+df_S7_1 <- filter(S7_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-03-25 06:00:00.000")
+end_time <- as.POSIXct("2023-03-25 22:00:00.000")
+df_S7_2 <- filter(S7_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-03-26 06:00:00.000")
+end_time <- as.POSIXct("2023-03-26 22:00:00.000")
+df_S7_3 <- filter(S7_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-03-27 06:00:00.000")
+end_time <- as.POSIXct("2023-03-27 22:00:00.000")
+df_S7_4 <- filter(S7_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-03-28 06:00:00.000")
+end_time <- as.POSIXct("2023-03-28 22:00:00.000")
+df_S7_5 <- filter(S7_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-03-29 06:00:00.000")
+end_time <- as.POSIXct("2023-03-29 22:00:00.000")
+df_S7_6 <- filter(S7_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-03-30 06:00:00.000")
+end_time <- as.POSIXct("2023-03-30 22:00:00.000")
+df_S7_7 <- filter(S7_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-03-31 06:00:00.000")
+end_time <- as.POSIXct("2023-03-31 22:00:00.000")
+df_S7_8 <- filter(S7_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-04-01 06:00:00.000")
+end_time <- as.POSIXct("2023-04-01 22:00:00.000")
+df_S7_9 <- filter(S7_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-04-02 06:00:00.000")
+end_time <- as.POSIXct("2023-04-02 22:00:00.000")
+df_S7_10 <- filter(S7_off, time > start_time & time < end_time)
+```
+
+Individual S8
+
+```{r}
+start_time <- as.POSIXct("2023-09-14 06:00:00.000")
+end_time <- as.POSIXct("2023-09-14 22:00:00.000")
+df_S8_1 <- filter(S8_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-09-15 06:00:00.000")
+end_time <- as.POSIXct("2023-09-15 22:00:00.000")
+df_S8_2 <- filter(S8_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-09-16 06:00:00.000")
+end_time <- as.POSIXct("2023-09-16 22:00:00.000")
+df_S8_3 <- filter(S8_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-09-17 06:00:00.000")
+end_time <- as.POSIXct("2023-09-17 22:00:00.000")
+df_S8_4 <- filter(S8_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-09-18 06:00:00.000")
+end_time <- as.POSIXct("2023-09-18 22:00:00.000")
+df_S8_5 <- filter(S8_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-09-19 06:00:00.000")
+end_time <- as.POSIXct("2023-09-19 22:00:00.000")
+df_S8_6 <- filter(S8_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-09-20 06:00:00.000")
+end_time <- as.POSIXct("2023-09-20 22:00:00.000")
+df_S8_7 <- filter(S8_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-09-21 06:00:00.000")
+end_time <- as.POSIXct("2023-09-21 22:00:00.000")
+df_S8_8 <- filter(S8_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-09-22 06:00:00.000")
+end_time <- as.POSIXct("2023-09-22 22:00:00.000")
+df_S8_9 <- filter(S8_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-09-23 06:00:00.000")
+end_time <- as.POSIXct("2023-09-23 22:00:00.000")
+df_S8_10 <- filter(S8_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2023-09-24 06:00:00.000")
+end_time <- as.POSIXct("2023-09-24 22:00:00.000")
+df_S8_11 <- filter(S8_off, time > start_time & time < end_time)
+```
+
+Individual S9
+
+```{r}
+start_time <- as.POSIXct("2022-09-23 06:00:00.000")
+end_time <- as.POSIXct("2022-09-23 22:00:00.000")
+df_S9_1 <- filter(S9_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2022-09-24 06:00:00.000")
+end_time <- as.POSIXct("2022-09-24 22:00:00.000")
+df_S9_2 <- filter(S9_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2022-09-25 06:00:00.000")
+end_time <- as.POSIXct("2022-09-25 22:00:00.000")
+df_S9_3 <- filter(S9_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2022-09-26 06:00:00.000")
+end_time <- as.POSIXct("2022-09-26 22:00:00.000")
+df_S9_4 <- filter(S9_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2022-09-27 06:00:00.000")
+end_time <- as.POSIXct("2022-09-27 22:00:00.000")
+df_S9_5 <- filter(S9_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2022-09-28 06:00:00.000")
+end_time <- as.POSIXct("2022-09-28 22:00:00.000")
+df_S9_6 <- filter(S9_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2022-09-29 06:00:00.000")
+end_time <- as.POSIXct("2022-09-29 22:00:00.000")
+df_S9_7 <- filter(S9_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2022-09-30 06:00:00.000")
+end_time <- as.POSIXct("2022-09-30 22:00:00.000")
+df_S9_8 <- filter(S9_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2022-10-01 06:00:00.000")
+end_time <- as.POSIXct("2022-10-01 22:00:00.000")
+df_S9_9 <- filter(S9_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2022-10-02 06:00:00.000")
+end_time <- as.POSIXct("2022-10-02 22:00:00.000")
+df_S9_10 <- filter(S9_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2022-10-03 06:00:00.000")
+end_time <- as.POSIXct("2022-10-03 22:00:00.000")
+df_S9_11 <- filter(S9_off, time > start_time & time < end_time)
+```
+
+Individual H10
+
+```{r}
+start_time <- as.POSIXct("2024-01-06 06:00:00.000")
+end_time <- as.POSIXct("2024-01-06 22:00:00.000")
+df_H10_1 <- filter(H10_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-01-07 06:00:00.000")
+end_time <- as.POSIXct("2024-01-07 22:00:00.000")
+df_H10_2 <- filter(H10_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-01-08 06:00:00.000")
+end_time <- as.POSIXct("2024-01-08 22:00:00.000")
+df_H10_3 <- filter(H10_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-01-09 06:00:00.000")
+end_time <- as.POSIXct("2024-01-09 22:00:00.000")
+df_H10_4 <- filter(H10_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-01-10 06:00:00.000")
+end_time <- as.POSIXct("2024-01-10 22:00:00.000")
+df_H10_5 <- filter(H10_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-01-11 06:00:00.000")
+end_time <- as.POSIXct("2024-01-11 22:00:00.000")
+df_H10_6 <- filter(H10_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-01-12 06:00:00.000")
+end_time <- as.POSIXct("2024-01-12 22:00:00.000")
+df_H10_7 <- filter(H10_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-01-13 06:00:00.000")
+end_time <- as.POSIXct("2024-01-13 22:00:00.000")
+df_H10_8 <- filter(H10_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-01-14 06:00:00.000")
+end_time <- as.POSIXct("2024-01-14 22:00:00.000")
+df_H10_9 <- filter(H10_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-01-15 06:00:00.000")
+end_time <- as.POSIXct("2024-01-15 22:00:00.000")
+df_H10_10 <- filter(H10_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-01-16 06:00:00.000")
+end_time <- as.POSIXct("2024-01-16 22:00:00.000")
+df_H10_11 <- filter(H10_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-01-17 06:00:00.000")
+end_time <- as.POSIXct("2024-01-17 22:00:00.000")
+df_H10_12 <- filter(H10_off, time > start_time & time < end_time)
+```
+
+Individual H11
+
+```{r}
+start_time <- as.POSIXct("2024-01-06 06:00:00.000")
+end_time <- as.POSIXct("2024-01-06 22:00:00.000")
+df_H11_1 <- filter(H11_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-01-07 06:00:00.000")
+end_time <- as.POSIXct("2024-01-07 22:00:00.000")
+df_H11_2 <- filter(H11_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-01-08 06:00:00.000")
+end_time <- as.POSIXct("2024-01-08 22:00:00.000")
+df_H11_3 <- filter(H11_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-01-09 06:00:00.000")
+end_time <- as.POSIXct("2024-01-09 22:00:00.000")
+df_H11_4 <- filter(H11_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-01-10 06:00:00.000")
+end_time <- as.POSIXct("2024-01-10 22:00:00.000")
+df_H11_5 <- filter(H11_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-01-11 06:00:00.000")
+end_time <- as.POSIXct("2024-01-11 22:00:00.000")
+df_H11_6 <- filter(H11_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-01-12 06:00:00.000")
+end_time <- as.POSIXct("2024-01-12 22:00:00.000")
+df_H11_7 <- filter(H11_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-01-13 06:00:00.000")
+end_time <- as.POSIXct("2024-01-13 22:00:00.000")
+df_H11_8 <- filter(H11_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-01-14 06:00:00.000")
+end_time <- as.POSIXct("2024-01-14 22:00:00.000")
+df_H11_9 <- filter(H11_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-01-15 06:00:00.000")
+end_time <- as.POSIXct("2024-01-15 22:00:00.000")
+df_H11_10 <- filter(H11_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-01-16 06:00:00.000")
+end_time <- as.POSIXct("2024-01-16 22:00:00.000")
+df_H11_11 <- filter(H11_off, time > start_time & time < end_time)
+```
+
+Individual H12
+
+```{r}
+start_time <- as.POSIXct("2024-06-13 06:00:00.000")
+end_time <- as.POSIXct("2024-06-13 22:00:00.000")
+df_H12_1 <- filter(H12_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-06-14 06:00:00.000")
+end_time <- as.POSIXct("2024-06-14 22:00:00.000")
+df_H12_2 <- filter(H12_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-06-15 06:00:00.000")
+end_time <- as.POSIXct("2024-06-15 22:00:00.000")
+df_H12_3 <- filter(H12_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-06-16 06:00:00.000")
+end_time <- as.POSIXct("2024-06-16 22:00:00.000")
+df_H12_4 <- filter(H12_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-06-17 06:00:00.000")
+end_time <- as.POSIXct("2024-06-17 22:00:00.000")
+df_H12_5 <- filter(H12_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-06-18 06:00:00.000")
+end_time <- as.POSIXct("2024-06-18 22:00:00.000")
+df_H12_6 <- filter(H12_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-06-19 06:00:00.000")
+end_time <- as.POSIXct("2024-06-19 22:00:00.000")
+df_H12_7 <- filter(H12_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-06-20 06:00:00.000")
+end_time <- as.POSIXct("2024-06-20 22:00:00.000")
+df_H12_8 <- filter(H12_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-06-21 06:00:00.000")
+end_time <- as.POSIXct("2024-06-21 22:00:00.000")
+df_H12_9 <- filter(H12_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-06-22 06:00:00.000")
+end_time <- as.POSIXct("2024-06-22 22:00:00.000")
+df_H12_10 <- filter(H12_off, time > start_time & time < end_time)
+```
+
+Individual H13
+
+```{r}
+start_time <- as.POSIXct("2024-03-12 06:00:00.000")
+end_time <- as.POSIXct("2024-03-12 22:00:00.000")
+df_H13_1 <- filter(H13_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-13 06:00:00.000")
+end_time <- as.POSIXct("2024-03-13 22:00:00.000")
+df_H13_2 <- filter(H13_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-14 06:00:00.000")
+end_time <- as.POSIXct("2024-03-14 22:00:00.000")
+df_H13_3 <- filter(H13_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-15 06:00:00.000")
+end_time <- as.POSIXct("2024-03-15 22:00:00.000")
+df_H13_4 <- filter(H13_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-16 06:00:00.000")
+end_time <- as.POSIXct("2024-03-16 22:00:00.000")
+df_H13_5 <- filter(H13_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-17 06:00:00.000")
+end_time <- as.POSIXct("2024-03-17 22:00:00.000")
+df_H13_6 <- filter(H13_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-18 06:00:00.000")
+end_time <- as.POSIXct("2024-03-18 22:00:00.000")
+df_H13_7 <- filter(H13_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-19 06:00:00.000")
+end_time <- as.POSIXct("2024-03-19 22:00:00.000")
+df_H13_8 <- filter(H13_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-20 06:00:00.000")
+end_time <- as.POSIXct("2024-03-20 22:00:00.000")
+df_H13_9 <- filter(H13_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-21 06:00:00.000")
+end_time <- as.POSIXct("2024-03-21 22:00:00.000")
+df_H13_10 <- filter(H13_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-22 06:00:00.000")
+end_time <- as.POSIXct("2024-03-22 22:00:00.000")
+df_H13_11 <- filter(H13_off, time > start_time & time < end_time)
+```
+
+Individual H14
+
+```{r}
+start_time <- as.POSIXct("2024-03-12 06:00:00.000")
+end_time <- as.POSIXct("2024-03-12 22:00:00.000")
+df_H14_1 <- filter(H14_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-13 06:00:00.000")
+end_time <- as.POSIXct("2024-03-13 22:00:00.000")
+df_H14_2 <- filter(H14_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-14 06:00:00.000")
+end_time <- as.POSIXct("2024-03-14 22:00:00.000")
+df_H14_3 <- filter(H14_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-15 06:00:00.000")
+end_time <- as.POSIXct("2024-03-15 22:00:00.000")
+df_H14_4 <- filter(H14_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-16 06:00:00.000")
+end_time <- as.POSIXct("2024-03-16 22:00:00.000")
+df_H14_5 <- filter(H14_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-17 06:00:00.000")
+end_time <- as.POSIXct("2024-03-17 22:00:00.000")
+df_H14_6 <- filter(H14_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-18 06:00:00.000")
+end_time <- as.POSIXct("2024-03-18 22:00:00.000")
+df_H14_7 <- filter(H14_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-19 06:00:00.000")
+end_time <- as.POSIXct("2024-03-19 22:00:00.000")
+df_H14_8 <- filter(H14_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-20 06:00:00.000")
+end_time <- as.POSIXct("2024-03-20 22:00:00.000")
+df_H14_9 <- filter(H14_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-21 06:00:00.000")
+end_time <- as.POSIXct("2024-03-21 22:00:00.000")
+df_H14_10 <- filter(H14_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-22 06:00:00.000")
+end_time <- as.POSIXct("2024-03-22 22:00:00.000")
+df_H14_11 <- filter(H14_off, time > start_time & time < end_time)
+```
+
+Individual H15
+
+```{r}
+start_time <- as.POSIXct("2024-03-12 06:00:00.000")
+end_time <- as.POSIXct("2024-03-12 22:00:00.000")
+df_H15_1 <- filter(H15_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-13 06:00:00.000")
+end_time <- as.POSIXct("2024-03-13 22:00:00.000")
+df_H15_2 <- filter(H15_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-14 06:00:00.000")
+end_time <- as.POSIXct("2024-03-14 22:00:00.000")
+df_H15_3 <- filter(H15_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-15 06:00:00.000")
+end_time <- as.POSIXct("2024-03-15 22:00:00.000")
+df_H15_4 <- filter(H15_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-16 06:00:00.000")
+end_time <- as.POSIXct("2024-03-16 22:00:00.000")
+df_H15_5 <- filter(H15_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-17 06:00:00.000")
+end_time <- as.POSIXct("2024-03-17 22:00:00.000")
+df_H15_6 <- filter(H15_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-18 06:00:00.000")
+end_time <- as.POSIXct("2024-03-18 22:00:00.000")
+df_H15_7 <- filter(H15_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-19 06:00:00.000")
+end_time <- as.POSIXct("2024-03-19 22:00:00.000")
+df_H15_8 <- filter(H15_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-20 06:00:00.000")
+end_time <- as.POSIXct("2024-03-20 22:00:00.000")
+df_H15_9 <- filter(H15_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-21 06:00:00.000")
+end_time <- as.POSIXct("2024-03-21 22:00:00.000")
+df_H15_10 <- filter(H15_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-22 06:00:00.000")
+end_time <- as.POSIXct("2024-03-22 22:00:00.000")
+df_H15_11 <- filter(H15_off, time > start_time & time < end_time)
+```
+
+Individual H16
+
+```{r}
+start_time <- as.POSIXct("2024-03-27 06:00:00.000")
+end_time <- as.POSIXct("2024-03-27 22:00:00.000")
+df_H16_1 <- filter(H16_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-28 06:00:00.000")
+end_time <- as.POSIXct("2024-03-28 22:00:00.000")
+df_H16_2 <- filter(H16_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-29 06:00:00.000")
+end_time <- as.POSIXct("2024-03-29 22:00:00.000")
+df_H16_3 <- filter(H16_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-30 06:00:00.000")
+end_time <- as.POSIXct("2024-03-31 22:00:00.000")
+df_H16_4 <- filter(H16_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-31 06:00:00.000")
+end_time <- as.POSIXct("2024-03-31 22:00:00.000")
+df_H16_5 <- filter(H16_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-04-01 06:00:00.000")
+end_time <- as.POSIXct("2024-04-01 22:00:00.000")
+df_H16_6 <- filter(H16_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-04-02 06:00:00.000")
+end_time <- as.POSIXct("2024-04-02 22:00:00.000")
+df_H16_7 <- filter(H16_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-04-03 06:00:00.000")
+end_time <- as.POSIXct("2024-04-03 22:00:00.000")
+df_H16_8 <- filter(H16_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-04-04 06:00:00.000")
+end_time <- as.POSIXct("2024-04-04 22:00:00.000")
+df_H16_9 <- filter(H16_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-04-05 06:00:00.000")
+end_time <- as.POSIXct("2024-04-05 22:00:00.000")
+df_H16_10 <- filter(H16_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-04-06 06:00:00.000")
+end_time <- as.POSIXct("2024-04-06 22:00:00.000")
+df_H16_11 <- filter(H16_off, time > start_time & time < end_time)
+```
+
+Individual H17
+
+```{r}
+start_time <- as.POSIXct("2024-03-26 06:00:00.000")
+end_time <- as.POSIXct("2024-03-26 22:00:00.000")
+df_H17_1 <- filter(H17_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-27 06:00:00.000")
+end_time <- as.POSIXct("2024-03-27 22:00:00.000")
+df_H17_2 <- filter(H17_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-28 06:00:00.000")
+end_time <- as.POSIXct("2024-03-28 22:00:00.000")
+df_H17_3 <- filter(H17_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-29 06:00:00.000")
+end_time <- as.POSIXct("2024-03-29 22:00:00.000")
+df_H17_4 <- filter(H17_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-30 06:00:00.000")
+end_time <- as.POSIXct("2024-03-30 22:00:00.000")
+df_H17_5 <- filter(H17_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-31 06:00:00.000")
+end_time <- as.POSIXct("2024-03-31 22:00:00.000")
+df_H17_6 <- filter(H17_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-04-01 06:00:00.000")
+end_time <- as.POSIXct("2024-04-01 22:00:00.000")
+df_H17_7 <- filter(H17_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-04-02 06:00:00.000")
+end_time <- as.POSIXct("2024-04-02 22:00:00.000")
+df_H17_8 <- filter(H17_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-04-03 06:00:00.000")
+end_time <- as.POSIXct("2024-04-03 22:00:00.000")
+df_H17_9 <- filter(H17_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-04-04 06:00:00.000")
+end_time <- as.POSIXct("2024-04-04 22:00:00.000")
+df_H17_10 <- filter(H17_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-04-05 06:00:00.000")
+end_time <- as.POSIXct("2024-04-05 22:00:00.000")
+df_H17_11 <- filter(H17_off, time > start_time & time < end_time)
+```
+
+Individual H18
+
+```{r}
+start_time <- as.POSIXct("2024-03-26 06:00:00.000")
+end_time <- as.POSIXct("2024-03-26 22:00:00.000")
+df_H18_1 <- filter(H18_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-27 06:00:00.000")
+end_time <- as.POSIXct("2024-03-27 22:00:00.000")
+df_H18_2 <- filter(H18_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-28 06:00:00.000")
+end_time <- as.POSIXct("2024-03-28 22:00:00.000")
+df_H18_3 <- filter(H18_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-29 06:00:00.000")
+end_time <- as.POSIXct("2024-03-29 22:00:00.000")
+df_H18_4 <- filter(H18_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-30 06:00:00.000")
+end_time <- as.POSIXct("2024-03-30 22:00:00.000")
+df_H18_5 <- filter(H18_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-03-31 06:00:00.000")
+end_time <- as.POSIXct("2024-03-31 22:00:00.000")
+df_H18_6 <- filter(H18_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-04-01 06:00:00.000")
+end_time <- as.POSIXct("2024-04-01 22:00:00.000")
+df_H18_7 <- filter(H18_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-04-02 06:00:00.000")
+end_time <- as.POSIXct("2024-04-02 22:00:00.000")
+df_H18_8 <- filter(H18_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-04-03 06:00:00.000")
+end_time <- as.POSIXct("2024-04-03 22:00:00.000")
+df_H18_9 <- filter(H18_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-04-04 06:00:00.000")
+end_time <- as.POSIXct("2024-04-04 22:00:00.000")
+df_H18_10 <- filter(H18_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-04-05 06:00:00.000")
+end_time <- as.POSIXct("2024-04-05 22:00:00.000")
+df_H18_11 <- filter(H18_off, time > start_time & time < end_time)
+```
+
+Individual H19
+
+```{r}
+start_time <- as.POSIXct("2024-04-23 06:00:00.000")
+end_time <- as.POSIXct("2024-04-23 22:00:00.000")
+df_H19_1 <- filter(H19_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-04-24 06:00:00.000")
+end_time <- as.POSIXct("2024-04-24 22:00:00.000")
+df_H19_2 <- filter(H19_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-04-25 06:00:00.000")
+end_time <- as.POSIXct("2024-04-25 22:00:00.000")
+df_H19_3 <- filter(H19_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-04-26 06:00:00.000")
+end_time <- as.POSIXct("2024-04-26 22:00:00.000")
+df_H19_4 <- filter(H19_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-04-27 06:00:00.000")
+end_time <- as.POSIXct("2024-04-27 22:00:00.000")
+df_H19_5 <- filter(H19_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-04-28 06:00:00.000")
+end_time <- as.POSIXct("2024-04-28 22:00:00.000")
+df_H19_6 <- filter(H19_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-04-29 06:00:00.000")
+end_time <- as.POSIXct("2024-04-29 22:00:00.000")
+df_H19_7 <- filter(H19_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-04-30 06:00:00.000")
+end_time <- as.POSIXct("2024-04-30 22:00:00.000")
+df_H19_8 <- filter(H19_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-05-01 06:00:00.000")
+end_time <- as.POSIXct("2024-05-01 22:00:00.000")
+df_H19_9 <- filter(H19_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-05-02 06:00:00.000")
+end_time <- as.POSIXct("2024-05-02 22:00:00.000")
+df_H19_10 <- filter(H19_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-05-03 06:00:00.000")
+end_time <- as.POSIXct("2024-05-03 22:00:00.000")
+df_H19_11 <- filter(H19_off, time > start_time & time < end_time)
+```
+
+Individual 20 including part A21
+
+```{r}
+start_time <- as.POSIXct("2024-10-10 06:00:00.000")
+end_time <- as.POSIXct("2024-10-10 22:00:00.000")
+df_A20_1 <- filter(A20_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-10-11 06:00:00.000")
+end_time <- as.POSIXct("2024-10-11 22:00:00.000")
+df_A20_2 <- filter(A20_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-10-12 06:00:00.000")
+end_time <- as.POSIXct("2024-10-12 22:00:00.000")
+df_A20_3 <- filter(A20_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-10-13 06:00:00.000")
+end_time <- as.POSIXct("2024-10-13 22:00:00.000")
+df_A20_4 <- filter(A20_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-10-14 06:00:00.000")
+end_time <- as.POSIXct("2024-10-14 22:00:00.000")
+df_A20_5 <- filter(A20_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-10-15 06:00:00.000")
+end_time <- as.POSIXct("2024-10-15 22:00:00.000")
+df_A20_6 <- filter(A20_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-10-16 06:00:00.000")
+end_time <- as.POSIXct("2024-10-16 22:00:00.000")
+df_A20_7 <- filter(A20_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-11-25 10:09:00.000")
+end_time <- as.POSIXct("2024-11-25 22:00:00.000")
+df_A20_8 <- filter(A21_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-11-26 06:00:00.000")
+end_time <- as.POSIXct("2024-11-26 22:00:00.000")
+df_A20_9 <- filter(A21_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-11-27 06:00:00.000")
+end_time <- as.POSIXct("2024-11-27 22:00:00.000")
+df_A20_10 <- filter(A21_off, time > start_time & time < end_time)
+```
+
+Individual A21
+
+```{r}
+start_time <- as.POSIXct("2024-11-20 06:00:00.000")
+end_time <- as.POSIXct("2024-11-20 22:00:00.000")
+df_A21_1 <- filter(A21_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-11-21 06:00:00.000")
+end_time <- as.POSIXct("2024-11-21 22:00:00.000")
+df_A21_2 <- filter(A21_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-11-22 06:00:00.000")
+end_time <- as.POSIXct("2024-11-22 22:00:00.000")
+df_A21_3 <- filter(A21_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-11-23 06:00:00.000")
+end_time <- as.POSIXct("2024-11-23 22:00:00.000")
+df_A21_4 <- filter(A21_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-11-24 06:00:00.000")
+end_time <- as.POSIXct("2024-11-24 22:00:00.000")
+df_A21_5 <- filter(A21_off, time > start_time & time < end_time)
+start_time <- as.POSIXct("2024-11-25 06:00:00.000")
+end_time <- as.POSIXct("2024-11-25 10:07:00.000")
+df_A21_6 <- filter(A21_off, time > start_time & time < end_time)
+```
+
+Misc.
+
+```{r}
+start_time <- as.POSIXct("2024-11-26 14:57:30.000")
+end_time <- as.POSIXct("2024-11-26 15:12:00.000")
+silly_walks <- A21_off %>% filter(time > start_time & time < end_time)
+
+start_time <- as.POSIXct("2025-03-08 06:00:00.000")
+end_time <- as.POSIXct("2025-03-08 22:00:00.000")
+misc1_1 <- Misc1 %>% filter(time > start_time & time < end_time)
+start_time <- as.POSIXct("2025-03-09 06:00:00.000")
+end_time <- as.POSIXct("2025-03-09 22:00:00.000")
+misc1_2 <- Misc1 %>% filter(time > start_time & time < end_time)
+
+start_time <- as.POSIXct("2025-03-08 06:00:00.000")
+end_time <- as.POSIXct("2025-03-08 22:00:00.000")
+misc2_1 <- Misc2 %>% filter(time > start_time & time < end_time)
+start_time <- as.POSIXct("2025-03-09 06:00:00.000")
+end_time <- as.POSIXct("2025-03-09 22:00:00.000")
+misc2_2 <- Misc2 %>% filter(time > start_time & time < end_time)
+```
+
+```{r}
+#Parameters
+wdw_size <- 150
+ma_data <- 5
+ma_energy <- 9
+kernel_func <- ma_gauss 
+std_dev <- 1
+upright_thresh <- 0.75
+abs_acc_thresh <- 0.1 #Can be both peak and valley. ``Sufficient acceleration''
+#Do not want footsteps to be from peak to valley or from valley to peak though!!!
+thresh_abs <- 0.005 
+thresh_rel <- 0.33 
+min_step_period <- 5
+max_step_period <- 40
+period_len <- 5 
+period_len_double <- 1
+period_thresh <- 0.18
+double_step_thresh <- 0.27
+thresh_direction <- 0.3
+``` 
+
+More lenient parameters
+
+```{r}
+wdw_size2 <- 150
+ma_data2 <- 1
+ma_energy2 <- 9
+kernel_func2 <- ma_gauss 
+std_dev2 <- 1
+upright_thresh2 <- 0.75
+abs_acc_thresh2 <- 0.1
+thresh_abs2 <- 0.001 
+thresh_rel2 <- 0.25 
+min_step_period2 <- 5
+max_step_period2 <- 60
+period_len2 <- 5 
+period_len_double2 <- 4
+period_thresh2 <- 0.08
+double_step_thresh2 <- 0.08
+thresh_direction2 <- 0.3
+```
+
+```{r}
+#Function
+unordered_walk_1 <- fast_extraction_algorithm(df_walk_1, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk_1 <- extraction_algorithm(df_walk_1, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk_2 <- fast_extraction_algorithm(df_walk_2, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk_3 <- fast_extraction_algorithm(df_walk_3, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk_4 <- fast_extraction_algorithm(df_walk_4, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk_5 <- fast_extraction_algorithm(df_walk_5, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk_6 <- fast_extraction_algorithm(df_walk_6, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk_7 <- fast_extraction_algorithm(df_walk_7, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk_8 <- fast_extraction_algorithm(df_walk_8, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk_9 <- fast_extraction_algorithm(df_walk_9, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk_10 <- fast_extraction_algorithm(df_walk_10, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+```
+
+```{r}
+unordered_S1_1 <- fast_extraction_algorithm(df_S1_1, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S1_2 <- fast_extraction_algorithm(df_S1_2, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S1_3 <- fast_extraction_algorithm(df_S1_3, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S1_4 <- fast_extraction_algorithm(df_S1_4, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S1_5 <- fast_extraction_algorithm(df_S1_5, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S1_6 <- fast_extraction_algorithm(df_S1_6, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S1_7 <- fast_extraction_algorithm(df_S1_7, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S1_8 <- fast_extraction_algorithm(df_S1_8, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S1_9 <- fast_extraction_algorithm(df_S1_9, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S1_10 <- fast_extraction_algorithm(df_S1_10, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S1_11 <- fast_extraction_algorithm(df_S1_11, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+```
+
+```{r}
+unordered_S2_1 <- fast_extraction_algorithm(df_S2_1, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S2_2 <- fast_extraction_algorithm(df_S2_2, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S2_3 <- fast_extraction_algorithm(df_S2_3, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S2_4 <- fast_extraction_algorithm(df_S2_4, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S2_5 <- fast_extraction_algorithm(df_S2_5, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S2_6 <- fast_extraction_algorithm(df_S2_6, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S2_7 <- fast_extraction_algorithm(df_S2_7, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S2_8 <- fast_extraction_algorithm(df_S2_8, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S2_9 <- fast_extraction_algorithm(df_S2_9, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S2_10 <- fast_extraction_algorithm(df_S2_10, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S2_11 <- fast_extraction_algorithm(df_S2_11, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+```
+
+```{r}
+unordered_S3_1 <- fast_extraction_algorithm(df_S3_1, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S3_2 <- fast_extraction_algorithm(df_S3_2, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S3_3 <- fast_extraction_algorithm(df_S3_3, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S3_4 <- fast_extraction_algorithm(df_S3_4, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S3_5 <- fast_extraction_algorithm(df_S3_5, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S3_6 <- fast_extraction_algorithm(df_S3_6, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S3_7 <- fast_extraction_algorithm(df_S3_7, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S3_8 <- fast_extraction_algorithm(df_S3_8, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S3_9 <- fast_extraction_algorithm(df_S3_9, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S3_10 <- fast_extraction_algorithm(df_S3_10, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S3_11 <- fast_extraction_algorithm(df_S3_11, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+```
+
+```{r}
+unordered_S4_1 <- fast_extraction_algorithm(df_S4_1, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S4_2 <- fast_extraction_algorithm(df_S4_2, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S4_3 <- fast_extraction_algorithm(df_S4_3, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S4_4 <- fast_extraction_algorithm(df_S4_4, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S4_5 <- fast_extraction_algorithm(df_S4_5, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S4_6 <- fast_extraction_algorithm(df_S4_6, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S4_7 <- fast_extraction_algorithm(df_S4_7, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S4_8 <- fast_extraction_algorithm(df_S4_8, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+```
+
+```{r}
+unordered_S5_1 <- fast_extraction_algorithm(df_S5_1, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S5_2 <- fast_extraction_algorithm(df_S5_2, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S5_3 <- fast_extraction_algorithm(df_S5_3, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S5_4 <- fast_extraction_algorithm(df_S5_4, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S5_5 <- fast_extraction_algorithm(df_S5_5, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S5_6 <- fast_extraction_algorithm(df_S5_6, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S5_7 <- fast_extraction_algorithm(df_S5_7, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S5_8 <- fast_extraction_algorithm(df_S5_8, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+```
+
+```{r}
+unordered_S6_1 <- fast_extraction_algorithm(df_S6_1, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S6_2 <- fast_extraction_algorithm(df_S6_2, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S6_3 <- fast_extraction_algorithm(df_S6_3, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S6_4 <- fast_extraction_algorithm(df_S6_4, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S6_5 <- fast_extraction_algorithm(df_S6_5, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S6_6 <- fast_extraction_algorithm(df_S6_6, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S6_7 <- fast_extraction_algorithm(df_S6_7, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S6_8 <- fast_extraction_algorithm(df_S6_8, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+```
+
+```{r}
+unordered_S7_1 <- fast_extraction_algorithm(df_S7_1, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S7_2 <- fast_extraction_algorithm(df_S7_2, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S7_3 <- fast_extraction_algorithm(df_S7_3, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S7_4 <- fast_extraction_algorithm(df_S7_4, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S7_5 <- fast_extraction_algorithm(df_S7_5, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S7_6 <- fast_extraction_algorithm(df_S7_6, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S7_7 <- fast_extraction_algorithm(df_S7_7, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S7_8 <- fast_extraction_algorithm(df_S7_8, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+```
+
+```{r}
+unordered_S8_1 <- fast_extraction_algorithm(df_S8_1, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S8_2 <- fast_extraction_algorithm(df_S8_2, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S8_3 <- fast_extraction_algorithm(df_S8_3, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S8_4 <- fast_extraction_algorithm(df_S8_4, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S8_5 <- fast_extraction_algorithm(df_S8_5, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S8_6 <- fast_extraction_algorithm(df_S8_6, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S8_7 <- fast_extraction_algorithm(df_S8_7, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S8_8 <- fast_extraction_algorithm(df_S8_8, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+```
+
+```{r}
+unordered_S9_1 <- fast_extraction_algorithm(df_S9_1, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S9_2 <- fast_extraction_algorithm(df_S9_2, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S9_3 <- fast_extraction_algorithm(df_S9_3, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S9_4 <- fast_extraction_algorithm(df_S9_4, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S9_5 <- fast_extraction_algorithm(df_S9_5, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S9_6 <- fast_extraction_algorithm(df_S9_6, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S9_7 <- fast_extraction_algorithm(df_S9_7, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_S9_8 <- fast_extraction_algorithm(df_S9_8, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+```
+
+```{r}
+unordered_H10_1 <- fast_extraction_algorithm(df_H10_1, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H10_2 <- fast_extraction_algorithm(df_H10_2, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H10_3 <- fast_extraction_algorithm(df_H10_3, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H10_4 <- fast_extraction_algorithm(df_H10_4, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H10_5 <- fast_extraction_algorithm(df_H10_5, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H10_6 <- fast_extraction_algorithm(df_H10_6, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H10_7 <- fast_extraction_algorithm(df_H10_7, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H10_8 <- fast_extraction_algorithm(df_H10_8, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+```
+
+```{r}
+unordered_H11_1 <- fast_extraction_algorithm(df_H11_1, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H11_2 <- fast_extraction_algorithm(df_H11_2, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H11_3 <- fast_extraction_algorithm(df_H11_3, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H11_4 <- fast_extraction_algorithm(df_H11_4, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H11_5 <- fast_extraction_algorithm(df_H11_5, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H11_6 <- fast_extraction_algorithm(df_H11_6, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H11_7 <- fast_extraction_algorithm(df_H11_7, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H11_8 <- fast_extraction_algorithm(df_H11_8, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+```
+
+```{r}
+unordered_H12_1 <- fast_extraction_algorithm(df_H12_1, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H12_2 <- fast_extraction_algorithm(df_H12_2, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H12_3 <- fast_extraction_algorithm(df_H12_3, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H12_4 <- fast_extraction_algorithm(df_H12_4, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H12_5 <- fast_extraction_algorithm(df_H12_5, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H12_6 <- fast_extraction_algorithm(df_H12_6, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H12_7 <- fast_extraction_algorithm(df_H12_7, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H12_8 <- fast_extraction_algorithm(df_H12_8, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+```
+
+```{r}
+unordered_H13_1 <- fast_extraction_algorithm(df_H13_1, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H13_2 <- fast_extraction_algorithm(df_H13_2, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H13_3 <- fast_extraction_algorithm(df_H13_3, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H13_4 <- fast_extraction_algorithm(df_H13_4, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H13_5 <- fast_extraction_algorithm(df_H13_5, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H13_6 <- fast_extraction_algorithm(df_H13_6, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H13_7 <- fast_extraction_algorithm(df_H13_7, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H13_8 <- fast_extraction_algorithm(df_H13_8, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+```
+
+```{r}
+unordered_H14_1 <- fast_extraction_algorithm(df_H14_1, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H14_2 <- fast_extraction_algorithm(df_H14_2, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H14_3 <- fast_extraction_algorithm(df_H14_3, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H14_4 <- fast_extraction_algorithm(df_H14_4, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H14_5 <- fast_extraction_algorithm(df_H14_5, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H14_6 <- fast_extraction_algorithm(df_H14_6, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H14_7 <- fast_extraction_algorithm(df_H14_7, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H14_8 <- fast_extraction_algorithm(df_H14_8, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+```
+
+```{r}
+unordered_H15_1 <- fast_extraction_algorithm(df_H15_1, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H15_2 <- fast_extraction_algorithm(df_H15_2, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H15_3 <- fast_extraction_algorithm(df_H15_3, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H15_4 <- fast_extraction_algorithm(df_H15_4, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H15_5 <- fast_extraction_algorithm(df_H15_5, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H15_6 <- fast_extraction_algorithm(df_H15_6, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H15_7 <- fast_extraction_algorithm(df_H15_7, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H15_8 <- fast_extraction_algorithm(df_H15_8, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+```
+
+```{r}
+unordered_H16_1 <- fast_extraction_algorithm(df_H16_1, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H16_2 <- fast_extraction_algorithm(df_H16_2, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H16_3 <- fast_extraction_algorithm(df_H16_3, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H16_4 <- fast_extraction_algorithm(df_H16_4, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H16_5 <- fast_extraction_algorithm(df_H16_5, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H16_6 <- fast_extraction_algorithm(df_H16_6, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H16_7 <- fast_extraction_algorithm(df_H16_7, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H16_8 <- fast_extraction_algorithm(df_H16_8, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+```
+
+```{r}
+unordered_H17_1 <- fast_extraction_algorithm(df_H17_1, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H17_2 <- fast_extraction_algorithm(df_H17_2, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H17_3 <- fast_extraction_algorithm(df_H17_3, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H17_4 <- fast_extraction_algorithm(df_H17_4, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H17_5 <- fast_extraction_algorithm(df_H17_5, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H17_6 <- fast_extraction_algorithm(df_H17_6, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H17_7 <- fast_extraction_algorithm(df_H17_7, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H17_8 <- fast_extraction_algorithm(df_H17_8, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+```
+
+```{r}
+unordered_H18_1 <- fast_extraction_algorithm(df_H18_1, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H18_2 <- fast_extraction_algorithm(df_H18_2, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H18_3 <- fast_extraction_algorithm(df_H18_3, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H18_4 <- fast_extraction_algorithm(df_H18_4, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H18_5 <- fast_extraction_algorithm(df_H18_5, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H18_6 <- fast_extraction_algorithm(df_H18_6, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H18_7 <- fast_extraction_algorithm(df_H18_7, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H18_8 <- fast_extraction_algorithm(df_H18_8, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+```
+
+```{r}
+unordered_H19_1 <- fast_extraction_algorithm(df_H19_1, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H19_2 <- fast_extraction_algorithm(df_H19_2, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H19_3 <- fast_extraction_algorithm(df_H19_3, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H19_4 <- fast_extraction_algorithm(df_H19_4, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H19_5 <- fast_extraction_algorithm(df_H19_5, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H19_6 <- fast_extraction_algorithm(df_H19_6, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H19_7 <- fast_extraction_algorithm(df_H19_7, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_H19_8 <- fast_extraction_algorithm(df_H19_8, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+```
+
+```{r}
+unordered_A20_1 <- fast_extraction_algorithm(df_A20_1, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_A20_2 <- fast_extraction_algorithm(df_A20_2, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_A20_3 <- fast_extraction_algorithm(df_A20_3, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_A20_4 <- fast_extraction_algorithm(df_A20_4, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_A20_5 <- fast_extraction_algorithm(df_A20_5, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_A20_6 <- fast_extraction_algorithm(df_A20_6, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_A20_7 <- fast_extraction_algorithm(df_A20_7, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_A20_8 <- fast_extraction_algorithm(df_A20_8, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_A20_9 <- fast_extraction_algorithm(df_A20_9, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+```
+
+```{r}
+unordered_A21_1 <- fast_extraction_algorithm(df_A21_1, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_A21_2 <- fast_extraction_algorithm(df_A21_2, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_A21_3 <- fast_extraction_algorithm(df_A21_3, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_A21_4 <- fast_extraction_algorithm(df_A21_4, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_A21_5 <- fast_extraction_algorithm(df_A21_5, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_A21_6 <- fast_extraction_algorithm(df_A21_6, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+```
+
+```{r}
+unordered_silly <- fast_extraction_algorithm(silly_walks, wdw_size2, ma_data2, ma_energy2, kernel_func2, upright_thresh2, abs_acc_thresh2, thresh_abs2, thresh_rel2, min_step_period2, max_step_period2, period_len2, period_len_double2, period_thresh2, double_step_thresh2, thresh_direction2, sigma = std_dev2)
+
+unordered_misc1_1 <- fast_extraction_algorithm(misc1_1, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_misc1_2 <- fast_extraction_algorithm(misc1_2, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_misc2_1 <- fast_extraction_algorithm(misc2_1, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_misc2_2 <- fast_extraction_algorithm(misc2_2, wdw_size, ma_data, ma_energy, ma_gauss, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+```

@@ -1,0 +1,47 @@
+```{r}
+start_time <- as.POSIXct("2023-05-30 19:00:55.100")
+end_time <- as.POSIXct("2023-05-30 19:00:56.720")
+
+filter(S2_off, time > start_time & time < end_time) %>% ggplot(aes(x = time)) + geom_line(aes(y = Y), colour = "blue") + geom_line(aes(y = Z), colour = "green") + geom_line(aes(y = X), colour = "red")
+
+filter(S2_off, time > start_time & time < end_time) %>% pull(Y) %>% ma(n = 8) %>% plot()
+```
+
+```{r}
+#Extracting as example
+#We take two full periods on the Y axis. From peak in Y (which is actually highest acceleration going down, closest to free fall) to just before peak two periods after. Total should be just over two seconds
+
+#A20 double step 1
+start_time <- as.POSIXct("2024-10-10 14:20:12.510")
+end_time <- as.POSIXct("2024-10-10 14:20:14.930")
+#A20 double step 2
+start_time <- as.POSIXct("2024-10-14 12:54:31.580")
+end_time <- as.POSIXct("2024-10-14 12:54:33.830")
+#A20 double step 3
+start_time <- as.POSIXct("2024-10-14 17:04:33.680")
+end_time <- as.POSIXct("2024-10-14 17:04:36.070")
+
+#A21 Martin double step 1
+start_time <- as.POSIXct("2024-11-24 07:55:33.640")
+end_time <- as.POSIXct("2024-11-24 07:55:35.610")
+#A21 Martin double stpe 2
+start_time <- as.POSIXct("2024-11-24 07:57:50.300")
+end_time <- as.POSIXct("2024-11-24 07:57:52.330")
+
+#A21 silly walk, type 2
+start_time <- as.POSIXct("2024-11-26 14:59:08.900")
+end_time <- as.POSIXct("2024-11-26 14:59:11.940")
+
+#S1 almost definitely cycling
+start_time <- as.POSIXct("2022-11-09 15:06:00.000")
+end_time <- as.POSIXct("2022-11-09 15:06:02.000")
+
+#S2 double step 1
+start_time <- as.POSIXct("2023-05-30 19:00:55.100")
+end_time <- as.POSIXct("2023-05-30 19:00:56.720")
+
+
+filter(A21_off, time > start_time & time < end_time) %>% ggplot(aes(x = time)) + geom_line(aes(y = Y), colour = "blue") + geom_line(aes(y = Z), colour = "green") + geom_line(aes(y = X), colour = "red")
+
+filter(A21_off, time > start_time & time < end_time) %>% pull(Y) %>% ma(n = 8) %>% plot()
+```
