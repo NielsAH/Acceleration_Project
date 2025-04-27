@@ -209,8 +209,14 @@ Sequence_constructor <- function(seq_list, seq_num, df, idx, period_len, period_
       }
       
       if((bw != 0) & (fw != 0)){ #We need a step forward and a step backward
-        double_step <- df$ma_vert[(idx - bw : idx + fw)]
+        double_step <- df$ma_vert[((idx - bw) : (idx + fw))]
+        
         acf_at_freq <- acf(double_step, lag.max = freq, plot = F)$acf[freq+1]
+        
+        if(length(double_step) < freq){
+          acf_at_freq <- -Inf #Never select. Value above is then NA
+        }
+        
         if(acf_at_freq > double_step_thresh) 
         {
           seq_num <- seq_num + 1 #We really do have a new sequence, as we have at least two steps
@@ -309,7 +315,7 @@ Sequence_constructor <- function(seq_list, seq_num, df, idx, period_len, period_
                   #If enough periodicity: add step going forward
                   #If little periodicity/correlation: stop collecting new steps
                   
-                  acf_at_freq <- acf(df$ma_vert[end_old:(end_new + freq - k*rounding)], lag.max = freq + k*abs(rounding), plot = F)$acf[floor((freq + freq - k*rounding)/2) + 1]
+                  acf_at_freq <- acf(df$ma_vert[(end_old):(end_new + freq - k*rounding)], lag.max = freq + k*abs(rounding), plot = F)$acf[floor((freq + freq - k*rounding)/2) + 1]
                   
                   if(acf_at_freq > period_thresh){
                     step_num_fw <- step_num_fw + 1
