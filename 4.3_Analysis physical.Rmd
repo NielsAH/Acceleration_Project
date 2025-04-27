@@ -1,0 +1,162 @@
+```{r, message=F, warning=F}
+#Data analysis
+library(tidyverse)
+library(latex2exp)
+library(patchwork)
+library(scales)
+library(RColorBrewer)
+
+#Working with the activity class and data files
+library(lubridate)
+library(read.gt3x)
+library(PhysicalActivity)
+
+#Solving equations
+library(nleqslv)
+library(pracma)
+library(latex2exp)
+
+#Reshaping / data manipulation
+library(reshape2)
+library(data.table)
+library(zeallot)
+
+##gganimate/creating animations
+library(gganimate)
+library(glue)
+library(shiny)
+library(av)
+library(magick)
+```
+
+##Checking out different parameters to detect steps
+
+```{r}
+param_default <- list(df_walk_1, 150, 1, 9, ma_gauss,
+                    0.75, 0.1, 0.001, 0.25,
+                    5, 60, 
+                    5, 3, 0.1, 
+                    0.1, 0.3, 1)
+```
+
+
+```{r}
+c(df, wdw_size, ma_data, ma_energy, kernel_func, 
+     upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, 
+     min_step_period, max_step_period, 
+     period_len, period_len_double, period_thresh, 
+     double_step_thresh, thresh_direction, std_dev) %<-% param_default
+
+unordered_walk1_wdwsize_1 <- fast_extraction_algorithm(df, 50, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk1_wdwsize_2 <- fast_extraction_algorithm(df, 100, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk1_wdwsize_3 <- fast_extraction_algorithm(df, 150, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk1_wdwsize_4 <- fast_extraction_algorithm(df, 200, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk1_wdwsize_5 <- fast_extraction_algorithm(df, 250, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+
+unordered_walk1_periodlen_1 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, 9, 9, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk1_periodlen_2 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, 7, 7, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk1_periodlen_3 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, 5, 5, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk1_periodlen_4 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, 4, 4, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk1_periodlen_5 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, 3, 3, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk1_periodlen_6 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, 2, 2, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk1_periodlen_7 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, 1, 1, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk1_periodlen_alt <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, 7, 1, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk1_periodlen_altalt <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, 1, 7, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+
+unordered_walk1_absandrel_1 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, 0.05, 0, 0, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk1_absandrel_2 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, 0.1, 0, 0.1, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk1_absandrel_3 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, 0.15, 0.05, 0.2, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk1_absandrel_4 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, 0.2, 0.05, 0.25, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk1_absandrel_5 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, 0.25, 0.1, 0.3, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk1_absandrel_6 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, 0.3, 0.15, 0.35, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+unordered_walk1_absandrel_7 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, 0.4, 0.3, 0.5, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+
+unordered_walk1_all_1 <- fast_extraction_algorithm(df, 150, ma_data, 9, kernel_func, upright_thresh, 0, 0, 0, min_step_period, max_step_period, 9, 9, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+#Maximising fraction of steps
+```
+
+```{r}
+unordered_data <- unordered_walk1_wdwsize_3
+
+total_time <- 0
+for(j in 1:length(unordered_data)){
+  if(unordered_data[[j]]$main_freq > 0)
+    print(unordered_data[[j]]$main_freq)
+  total_time <- total_time + nrow(unordered_data[[j]]$data)/30 
+}
+total_time/323
+```
+
+##Trying to get the physical aspect to be sensible
+
+```{r}
+current_mvm <- 1
+
+test_mvm <- unordered_data[[current_mvm]]
+test_data <- test_mvm$data
+
+start_current_mvm <- test_data$time[1] %>% as.numeric()
+
+if(current_mvm > 1){
+  end_last_run <- unordered_data[[current_mvm - 1]]$data$time[1] %>% as.numeric()
+} else{
+  end_last_mvm <- as.numeric(df$time[1]) - 1/30
+}
+
+times_to_check <- c()
+for(k in 1:50){
+  if(start_current_mvm - k/30 > end_last_mvm + 0.01){ #0.01 just to make sure with rounding and such
+    new_start <- start_current_mvm - k/30
+    times_to_check <- append(times_to_check, new_start)
+  }
+}
+times_to_check <- rev(times_to_check)
+
+data_to_check <- filter(df, time >= times_to_check[1] & time <= times_to_check[length(times_to_check)])
+differences_to_check <- abs(diff(data_to_check$X)) + abs(diff(data_to_check$Y)) + abs(diff(data_to_check$Z))
+idx_to_start <- which.min(differences_to_check) 
+
+time_to_start <- times_to_check[idx_to_start]
+time_to_stop <- test_data$time[length(test_data$time)] %>% as.numeric()
+
+data_to_analyse <- filter(df, time >= time_to_start & time <= time_to_stop)
+added_idc <- 1 + length(times_to_check) - idx_to_start
+
+if(added_idc + nrow(test_data) == nrow(data_to_analyse)){
+  print("Correct")
+}else{
+  print("Mistake")
+}
+
+#Now see if the physical part works
+data_to_analyse_new <- data_to_analyse
+
+rest_x <- mean(data_to_analyse$X)
+rest_y <- mean(data_to_analyse$Y)
+rest_z <- mean(data_to_analyse$Z)
+rest_vec <- c(rest_x, rest_y, rest_z)
+rot_mat <- rotation_initial(c(rest_x, rest_y, rest_z))[[1]]
+data_to_analyse_new[, 2:4] <- t(rot_mat %*% t(data_to_analyse[, 2:4]))
+data_to_analyse_new$Y <- data_to_analyse_new$Y - mean(data_to_analyse_new$Y)
+
+x_acc <- data_to_analyse_new$X
+z_acc <- data_to_analyse_new$Z
+acc_matrix <- cbind(x_acc, z_acc)
+cov_matrix <- cov(acc_matrix)
+eig <- eigen(cov_matrix)
+forward_vector <- eig$vectors[, 1]
+
+angle_rad <- atan2(abs(forward_vector[2]), abs(forward_vector[1]))
+rotation_matrix <- matrix(c(cos(angle_rad), -sin(angle_rad), 
+                            sin(angle_rad), cos(angle_rad)), nrow = 2)
+rotated_acc <- acc_matrix %*% t(rotation_matrix)
+    
+data_to_analyse_new$X <- rotated_acc[, 2]
+data_to_analyse_new$Z <- rotated_acc[, 1]
+
+plot(cumsum(data_to_analyse_new$Z*9.80665/30)[75:150], type = 'l')
+
+
+```
+
+Is this running or walking? Why would main freq be 10 if it is walking? Velocity seems to indicate walking though
