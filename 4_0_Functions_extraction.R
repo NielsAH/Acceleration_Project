@@ -175,7 +175,7 @@ Sequence_constructor <- function(seq_list, seq_num, df, idx, period_len, period_
   #Has value 1 if it was rounded down, e.g. 33.2 to 33. Has value -1 if it was rounded up
   
   if((idx + freq + 1 <= N) & (idx - freq - 1 >= 1)){
-    if(sum(df$in_seq[(idx - freq - period_len_double) : (idx + freq + period_len_double)]) == 0 ) { #We need the values from the double step not yet in a sequence
+    if(isTRUE(sum(df$in_seq[(idx - freq - period_len_double) : (idx + freq + period_len_double)]) == 0 )) { #We need the values from the double step not yet in a sequence
       fw <- 0 #How far fw peak is. If stays 0: no peak
       bw <- 0 #How far bw peak is. If stays 0: no peak
       
@@ -604,19 +604,21 @@ Glue_and_classify <- function(seq_list, time_thresh, freq_diff_thresh, min_total
   overarch[1] <- num
   sorted_seq[[1]]$overarch <- num
   
-  for(j in 2:length(sorted_seq)){
-    
-    #If too much time between them, we always get a new sequence
-    
-    time_diff <- (sorted_seq[[j]]$data$time[1] - tail(sorted_seq[[j-1]]$data$time, 1))
-    if(as.numeric(time_diff, units = "secs") > time_thresh){
-      num <- num + 1
-    } #We can also get a new sequence if different frequency: often when going from running to walking or vice versa
-    else if(abs(sorted_seq[[j]]$main_freq - sorted_seq[[j-1]]$main_freq) > freq_diff_thresh){
-      num <- num + 1 
+  if(length(sorted_seq) > 1){
+    for(j in 2:length(sorted_seq)){
+      
+      #If too much time between them, we always get a new sequence
+      
+      time_diff <- (sorted_seq[[j]]$data$time[1] - tail(sorted_seq[[j-1]]$data$time, 1))
+      if(as.numeric(time_diff, units = "secs") > time_thresh){
+        num <- num + 1
+      } #We can also get a new sequence if different frequency: often when going from running to walking or vice versa
+      else if(abs(sorted_seq[[j]]$main_freq - sorted_seq[[j-1]]$main_freq) > freq_diff_thresh){
+        num <- num + 1 
+      }
+      overarch[j] <- num
+      sorted_seq[[j]]$overarch <- num
     }
-    overarch[j] <- num
-    sorted_seq[[j]]$overarch <- num
   }
   
   

@@ -123,7 +123,7 @@ plot(cumsum(data_to_analyse_new$X*9.80665/30), type = 'l')
 
 ```{r}
 #start_time <- as.POSIXct("2025-04-08 11:14:23.335") #Start time tread2 video
-df_tread2 <- N_video %>% filter(time > as.POSIXct("2025-04-08 11:14:23.335") & time < as.POSIXct("2025-04-08 11:20:31.335"))
+df_tread2 <- N_video %>% filter(time > as.POSIXct("2025-04-08 11:08:33.800") & time < as.POSIXct("2025-04-08 11:14:41.335"))
 
 param_default <- list(df_tread2, 150, 1, 9, ma_gauss,
                     0.75, 0.1, 0.001, 0.25,
@@ -140,7 +140,48 @@ c(df, wdw_size, ma_data, ma_energy, kernel_func,
 
 ```{r}
 unordered_data <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
-#as.POSIXct("2025-01-20 10:31:19.372") #Start of walking video
+#as.POSIXct("2025-04-08 11:09:23.800") #Start of treadmill video
 data <- Glue_and_classify(unordered_data, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
 ```
+
+Analysis of (part of the) 18km/u part, using existing vert/fw/side
+
+```{r}
+correction_fw_18_tread2 <- 5.596
+data_18km <- data[[3]]$data %>% filter(time > as.POSIXct("2025-04-08 11:09:29.000") & time < as.POSIXct("2025-04-08 11:09:59.000"))
+data_18km %>% nrow()
+
+(cumsum(data_18km$acc_fw*9.80665/30) + correction_fw_18_tread2) %>% plot(type = 'l')
+(cumsum(data_18km$acc_side*9.80665/30)) %>% plot(type = 'l')
+(cumsum(data_18km$acc_vert*9.80665/30) - 0.18) %>% plot(type = 'l')
+#Vert being most accurate seems to imply it is partly that position accelerometer changes a bit
+
+correction_fw_12_tread2 <- 0
+data_12km <- data[[4]]$data %>% filter(time > as.POSIXct("2025-04-08 11:10:19.000") & time < as.POSIXct("2025-04-08 11:11:49.000"))
+#Three different orientations clearly visible, because "average" is used to compute angles
+(cumsum(data_12km$acc_fw*9.80665/30) + correction_fw_12_tread2) %>% plot(type = 'l')
+(cumsum(data_12km$acc_side*9.80665/30)) %>% plot(type = 'l')
+(cumsum(data_12km$acc_vert*9.80665/30)) %>% plot(type = 'l')
+
+#When we zoom in on one of the orientations:
+df_12km_orient1 <- N_video %>% filter(time > as.POSIXct("2025-04-08 11:10:18.000") & time < as.POSIXct("2025-04-08 11:10:40.000"))
+unordered_data <- fast_extraction_algorithm(df_12km_orient1, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+#as.POSIXct("2025-04-08 11:09:23.800") #Start of treadmill video
+data <- Glue_and_classify(unordered_data, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+correction_fw_12_orient1 <- 2.537
+data_12km_orient1 <- data[[1]]$data
+(cumsum(data_12km_orient1$acc_fw*9.80665/30) + correction_fw_12_orient1) %>% plot(type = 'l')
+(cumsum(data_12km_orient1$acc_side*9.80665/30)) %>% plot(type = 'l')
+(cumsum(data_12km_orient1$acc_vert*9.80665/30)) %>% plot(type = 'l')
+
+#Lastly we do one of the orientations for 10km/u
+df_10km_orient1 <- N_video %>% filter(time > as.POSIXct("2025-04-08 11:11:58.000") & time < as.POSIXct("2025-04-08 11:12:20.000"))
+unordered_data <- fast_extraction_algorithm(df_10km_orient1, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+#as.POSIXct("2025-04-08 11:09:23.800") #Start of treadmill video
+data <- Glue_and_classify(unordered_data, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+correction_fw_10_orient1 <- 1.873
+data_10km_orient1 <- data[[1]]$data
+(cumsum(data_10km_orient1$acc_fw*9.80665/30) + correction_fw_10_orient1) %>% plot(type = 'l')
+(cumsum(data_10km_orient1$acc_side*9.80665/30)) %>% plot(type = 'l')
+(cumsum(data_10km_orient1$acc_vert*9.80665/30)) %>% plot(type = 'l')
 ```
