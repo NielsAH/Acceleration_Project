@@ -116,7 +116,7 @@ rotated_acc <- acc_matrix %*% t(rotation_matrix)
 data_to_analyse_new$X <- rotated_acc[, 2]
 data_to_analyse_new$Z <- rotated_acc[, 1]
 
-plot(cumsum(data_to_analyse_new$X*9.80665/30), type = 'l')
+plot(cumsum(data_to_analyse_new$Y*9.80665/30), type = 'l')
 ```
 
 ## Analysis of treadmill data, using existing vert/fw/side example
@@ -156,7 +156,7 @@ data_18km %>% nrow()
 (cumsum(data_18km$acc_vert*9.80665/30) - 0.18) %>% plot(type = 'l')
 #Vert being most accurate seems to imply it is partly that position accelerometer changes a bit
 
-correction_fw_12_tread2 <- 0
+correction_fw_12_tread2 <- 3.33
 data_12km <- data[[4]]$data %>% filter(time > as.POSIXct("2025-04-08 11:10:19.000") & time < as.POSIXct("2025-04-08 11:11:49.000"))
 #Three different orientations clearly visible, because "average" is used to compute angles
 (cumsum(data_12km$acc_fw*9.80665/30) + correction_fw_12_tread2) %>% plot(type = 'l')
@@ -179,9 +179,9 @@ df_10km_orient1 <- N_video %>% filter(time > as.POSIXct("2025-04-08 11:11:58.000
 unordered_data <- fast_extraction_algorithm(df_10km_orient1, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
 #as.POSIXct("2025-04-08 11:09:23.800") #Start of treadmill video
 data <- Glue_and_classify(unordered_data, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
-correction_fw_10_orient1 <- 1.873
-data_10km_orient1 <- data[[1]]$data
-(cumsum(data_10km_orient1$acc_fw*9.80665/30) + correction_fw_10_orient1) %>% plot(type = 'l')
-(cumsum(data_10km_orient1$acc_side*9.80665/30)) %>% plot(type = 'l')
-(cumsum(data_10km_orient1$acc_vert*9.80665/30)) %>% plot(type = 'l')
+correction_fw_6_orient1 <- 1.873
+data_6km_orient1 <- data[[1]]$data
+(cumsum(data_6km_orient1$acc_fw*9.80665/30) + correction_fw_6_orient1) %>% plot(type = 'l')
+(cumsum(data_6km_orient1$acc_side*9.80665/30)) %>% plot(type = 'l')
+(cumsum(data_6km_orient1$acc_vert*9.80665/30)) %>% plot(type = 'l')
 ```

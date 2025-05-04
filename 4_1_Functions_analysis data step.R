@@ -30,6 +30,12 @@ vert_absolute <- function(step, param){
   return(sum(abs(step$acc_vert)))
 }
 
+#Because actually only negative acceleration takes energy. Positive acceleration is from gravity
+vert_upwards_absolute <- function(step, param){
+  vert_pos_idc <- which(step$acc_vert < 0)
+  -sum(step$acc_vert[vert_pos_idc])
+}
+
 fw_max <- function(step, param){
   return(max(abs(step$acc_fw)))
 } #Risk is that shorter frequencies yield higher values. Still maybe interesting

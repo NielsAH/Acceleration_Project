@@ -413,11 +413,11 @@ generate_images <- function(folder_name,
     p_fw <- ggplot(frame_selection, aes(x = idx, y = value_fw)) +
       geom_line() +
       geom_point(aes(color = factor(colour), size = factor(colour))) +
-      scale_colour_manual(values = c("1" = "black", "3" = "#009E73", "4" = "#E69F00", "2" = "#984EA3"),
-                          labels = c("Current observation", "Odd step pairs", "Even step pairs", "No activity"),
+      scale_colour_manual(values = c("1" = "black", "2" = "#984EA3", "3" = "#009E73", "4" = "#E69F00"),
+                          labels = c("Current observation", "No activity", "Odd step pairs", "Even step pairs"),
                           name = "") +
-      scale_size_manual(values = c("1" = 15, "3" = 5, "4" = 5, "2" = 5),
-                        labels = c("Current observation", "Odd step pairs", "Even step pairs", "No activity"),
+      scale_size_manual(values = c("1" = 15, "2" = 5, "3" = 5, "4" = 5),
+                        labels = c("Current observation", "No activity", "Odd step pairs", "Even step pairs"),
                         name = "") +
       transition_manual(frame) +
       ylim(fw_bottom, fw_top) +
@@ -438,11 +438,11 @@ generate_images <- function(folder_name,
     p_vert <- ggplot(frame_selection, aes(x = idx, y = value_vert)) +
       geom_line() +
       geom_point(aes(color = factor(colour), size = factor(colour))) +
-      scale_colour_manual(values = c("1" = "black", "3" = "#009E73", "4" = "#E69F00", "2" = "#984EA3"),
-                          labels = c("Current observation", "Odd step pairs", "Even step pairs", "No activity"),
+      scale_colour_manual(values = c("1" = "black", "2" = "#984EA3", "3" = "#009E73", "4" = "#E69F00"),
+                          labels = c("Current observation", "No activity", "Odd step pairs", "Even step pairs"),
                           name = "") +
       scale_size_manual(values = c("1" = 15, "2" = 5, "3" = 5, "4" = 5),
-                        labels = c("Current observation", "Odd step pairs", "Even step pairs", "No activity"),
+                        labels = c("Current observation", "No activity", "Odd step pairs", "Even step pairs"),
                         name = "") +
       transition_manual(frame) +
       ylim(vert_bottom, vert_top) +
@@ -463,11 +463,11 @@ generate_images <- function(folder_name,
     p_side <- ggplot(frame_selection, aes(x = idx, y = value_side)) +
       geom_line() +
       geom_point(aes(color = factor(colour), size = factor(colour))) +
-      scale_colour_manual(values = c("1" = "black", "3" = "#009E73", "4" = "#E69F00", "2" = "#984EA3"),
-                          labels = c("Current observation", "Odd step pairs", "Even step pairs", "No activity"),
+      scale_colour_manual(values = c("1" = "black", "2" = "#984EA3", "3" = "#009E73", "4" = "#E69F00"),
+                          labels = c("Current observation", "No activity", "Odd step pairs", "Even step pairs"),
                           name = "") +
       scale_size_manual(values = c("1" = 15, "2" = 5, "3" = 5, "4" = 5),
-                        labels = c("Current observation", "Odd step pairs", "Even step pairs", "No activity"),
+                        labels = c("Current observation", "No activity", "Odd step pairs", "Even step pairs"),
                         name = "") +
       transition_manual(frame) +
       ylim(side_bottom, side_top) +

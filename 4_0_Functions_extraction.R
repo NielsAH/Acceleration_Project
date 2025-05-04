@@ -213,6 +213,7 @@ Sequence_constructor <- function(seq_list, seq_num, df, idx, period_len, period_
         
         acf_at_freq <- acf(double_step, lag.max = freq, plot = F)$acf[freq+1]
         
+        
         if(length(double_step) < freq){
           acf_at_freq <- -Inf #Never select. Value above is then NA
         }
@@ -843,4 +844,320 @@ Fast_big_window_manipulation <- function(df, wdw_size, ma_data, ma_energy, uprig
   df$in_step_bw <- numeric(N)
   
   return(df)
+}
+
+Sequence_constructor_rescale <- function(seq_list, seq_num, df, idx, period_len, period_len_double, period_thresh, double_step_thresh, rescale_n){
+  
+  if(df$upright_inverted[idx] == -1){
+    df$step_start <- df$step_peak
+    inverted <- -1
+  }
+  else if(df$upright_inverted[idx] == 1){
+    df$step_start <- df$step_valley
+    inverted <- 1
+  }
+  else{
+    print("Error has occurred. Starting index sequence is not upright even after filtering such sequences out.")
+  }
+  
+  N <- nrow(df)
+  
+  freq <- round(df$frequencies[idx]*2) #For now we keep it simple. In reality may not want to multiply by 2, but fine to know we always do that for now
+  rounding <- ifelse(((freq - floor(df$frequencies[idx]*2)) == 0), 1, -1)
+  #Has value 1 if it was rounded down, e.g. 33.2 to 33. Has value -1 if it was rounded up
+  
+  if((idx + freq + 1 <= N) & (idx - freq - 1 >= 1)){
+    if(isTRUE(sum(df$in_seq[(idx - freq - period_len_double) : (idx + freq + period_len_double)]) == 0 )) { #We need the values from the double step not yet in a sequence
+      fw <- 0 #How far fw peak is. If stays 0: no peak
+      bw <- 0 #How far bw peak is. If stays 0: no peak
+      
+      
+      if(df$step_start[idx + freq] == 1){
+        fw <- freq
+      }
+      else{ #If not at precise frequency a forward start (peak/valley)
+        for(l in 1:period_len_double){
+          if(df$step_start[idx + freq + rounding + (l - 1)] == 1){
+            fw <- freq + rounding + (l-1)
+          }
+          else if(df$step_start[idx + freq - rounding - (l - 1)] == 1){
+            fw <- freq - rounding - (l - 1)
+          }
+        }
+      }
+      
+      if(df$step_start[idx - freq] == 1){
+        bw <- freq
+      }
+      else{
+        for(l in 1:period_len_double){
+          if(df$step_start[idx - (freq + rounding + (l-1))] == 1){
+            bw <- freq + rounding + (l - 1)
+          }
+          else if(df$step_start[idx - (freq - rounding - (l - 1))] == 1){
+            bw <- freq - rounding - (l-1)
+          }
+        }
+      }
+      
+      if((bw != 0) & (fw != 0)){ #We need a step forward and a step backward
+        double_step <- df$ma_vert[((idx - bw) : (idx + fw))]
+        
+        #Change code from here onwards where I compute the acf
+        #Acf_at_freq should becompe the acf between consecutive steps both rescaled to have length n, at lag n
+        acf_at_freq <- acf(double_step, lag.max = freq, plot = F)$acf[freq+1]
+        
+        
+        if(length(double_step) < freq){
+          acf_at_freq <- -Inf #Never select. Value above is then NA
+        }
+        
+        if(acf_at_freq > double_step_thresh) 
+        {
+          seq_num <- seq_num + 1 #We really do have a new sequence, as we have at least two steps
+          print(seq_num)
+          seq_list[[seq_num]] <- list(data = data.frame(), cor_fw = c(), cor_bw = c(), main_freq = df$frequencies[idx], inverted = inverted, class = 1)
+          
+          step_num_fw <- 1
+          step_num_bw <- 1 
+          
+          df$in_seq[(idx):(idx + fw - 1)] <- seq_num
+          df$in_seq[c((idx - bw):(idx - 1))] <- seq_num
+          df$in_step_fw[(idx):(idx + fw - 1)] <- step_num_fw
+          df$in_step_bw[c((idx - bw):(idx - 1))] <- step_num_bw
+          
+          seq_list[[seq_num]]$cor_fw <- append(seq_list[[seq_num]]$cor_fw, acf_at_freq)
+          seq_list[[seq_num]]$cor_bw <- append(seq_list[[seq_num]]$cor_bw, acf_at_freq)
+          
+          #From here go backward and forward to find more steps by checking if similar to last
+          #First add steps to the sequence going forward
+          
+          forward <- T #Still chance of adding forward steps
+          end_old <- idx
+          end_new <- idx + fw #Current last one: we already know it is a valley
+          
+          while(forward){
+            peak_found <- F
+            
+            if((end_new + freq + period_len) > N){
+              
+              
+              forward <- F #We are at or close to end of dataframe. Cannot add new ones
+              
+            }
+            else if(sum(df$in_seq[end_new:(end_new+freq+period_len)]) != 0){
+              
+              forward <- F 
+              
+              #We do not want to overlap with another sequence of movements. Later can add that we may want
+              #to merge here // throw a message, but in principle indicates a break at some point,
+              #as otherwise we would have detected this one earlier
+            }
+            else if(df$step_start[end_new + freq] == 1){
+              #If enough periodicity: add step going forward
+              
+              acf_at_freq <- acf(df$ma_vert[end_old:(end_new + freq)], lag.max = freq, plot = F)$acf[freq + 1]
+              
+              if(acf_at_freq > period_thresh){
+                step_num_fw <- step_num_fw + 1
+                
+                df$in_seq[(end_new):(end_new+freq - 1)] <- seq_num
+                df$in_step_fw[(end_new):(end_new+freq - 1)] <- step_num_fw
+                
+                seq_list[[seq_num]]$cor_fw <- append(seq_list[[seq_num]]$cor_fw, acf_at_freq)
+                
+                peak_found <- T
+                
+                end_old <- end_new
+                end_new <- end_new + freq
+                
+              } else{  #If little periodicity/correlation: stop collecting new steps 
+                
+                forward <- F
+                
+              }
+            } else{ #If not at lag difference of 0, see if at any other lag
+              for(k in 1:period_len){
+                if (df$step_start[end_new + freq + k*rounding] == 1){
+                  #If enough periodicity: add step going forward
+                  #If little periodicity/correlation: stop collecting new steps
+                  #If enough periodicity: add step going forward
+                  
+                  acf_at_freq <- acf(df$ma_vert[end_old:(end_new + freq + k*rounding)], lag.max = freq + k*abs(rounding), plot = F)$acf[floor((freq + freq + k*rounding)/2) + 1]
+                  
+                  if(acf_at_freq > period_thresh){
+                    step_num_fw <- step_num_fw + 1
+                    
+                    df$in_seq[(end_new):(end_new+freq+k*rounding - 1)] <- seq_num
+                    df$in_step_fw[(end_new):(end_new+freq+k*rounding - 1)] <- step_num_fw
+                    
+                    seq_list[[seq_num]]$cor_fw <- append(seq_list[[seq_num]]$cor_fw, acf_at_freq)
+                    
+                    peak_found <- T
+                    
+                    end_old <- end_new
+                    end_new <- end_new + freq + k*rounding
+                    
+                  } else{  #If little periodicity/correlation: stop collecting new steps 
+                    
+                    forward <- F
+                    
+                  } 
+                  
+                  break
+                }
+                else if (df$step_start[end_new + freq - k*rounding] == 1){
+                  #If enough periodicity: add step going forward
+                  #If little periodicity/correlation: stop collecting new steps
+                  
+                  acf_at_freq <- acf(df$ma_vert[(end_old):(end_new + freq - k*rounding)], lag.max = freq + k*abs(rounding), plot = F)$acf[floor((freq + freq - k*rounding)/2) + 1]
+                  
+                  if(acf_at_freq > period_thresh){
+                    step_num_fw <- step_num_fw + 1
+                    
+                    df$in_seq[(end_new):(end_new+freq-k*rounding - 1)] <- seq_num
+                    df$in_step_fw[(end_new):(end_new+freq-k*rounding - 1)] <- step_num_fw
+                    
+                    seq_list[[seq_num]]$cor_fw <- append(seq_list[[seq_num]]$cor_fw, acf_at_freq)
+                    
+                    peak_found <- T
+                    
+                    end_old <- end_new
+                    end_new <- end_new + freq - k*rounding
+                  } else{  #If little periodicity/correlation: stop collecting new steps 
+                    
+                    forward <- F
+                    
+                  }   
+                  
+                  break
+                }
+                
+              }
+              
+              #Here handle case that after this for-loop still no peak found: also
+              #stop collecting new steps
+              if(peak_found == F){
+                forward <- F
+              }
+            }
+          }
+          
+          #Now add steps to the sequence going back
+          backward <- T #Still chance of adding forward steps
+          start_old <- idx
+          start_new <- idx - bw #Current first one: we already know it is a valley
+          
+          while(backward){
+            peak_found <- F
+            
+            if((start_new - freq - period_len) < 1){
+              backward <- F #We are at or close to start of dataframe. Cannot add new ones
+            }
+            else if(sum(df$in_seq[(start_new - freq - period_len):(start_new - 1)]) != 0){
+              backward <- F 
+              
+              #We do not want to overlap with another sequence of movements. Later can add that we may want
+              #to merge here // throw a message, but in principle indicates a break at some point,
+              #as otherwise we would have detected this one earlier
+            }
+            else if(df$step_start[start_new - freq] == 1){
+              #If enough periodicity: add step going backward
+              acf_at_freq <- acf(df$ma_vert[(start_new - freq):(start_old)], lag.max = freq, plot = F)$acf[freq + 1]
+              
+              if(acf_at_freq > period_thresh){
+                step_num_bw <- step_num_bw + 1
+                
+                df$in_seq[(start_new - freq):(start_new - 1)] <- seq_num
+                df$in_step_bw[(start_new - freq):(start_new - 1)] <- step_num_bw
+                
+                seq_list[[seq_num]]$cor_bw <- append(seq_list[[seq_num]]$cor_bw, acf_at_freq)
+                
+                peak_found <- T
+                
+                start_old <- start_new
+                start_new <- start_new - freq
+              } else{  #If little periodicity/correlation: stop collecting new steps 
+                
+                backward <- F
+                
+              }
+            } else{ #If not at lag difference of 0, see if at any other lag
+              for(k in 1:period_len){
+                
+                if (df$step_start[start_new - (freq + k*rounding)] == 1){
+                  #If enough periodicity: add step going forward
+                  #If little periodicity/correlation: stop collecting new steps
+                  #If enough periodicity: add step going forward
+                  
+                  acf_at_freq <- acf(df$ma_vert[(start_new - (freq + k*rounding)):(start_old)], lag.max = freq + k*abs(rounding), plot = F)$acf[floor((freq + freq + k*rounding)/2) + 1]
+                  
+                  if(acf_at_freq > period_thresh){
+                    step_num_bw <- step_num_bw + 1
+                    
+                    df$in_seq[(start_new - (freq + k*rounding)):(start_new - 1)] <- seq_num
+                    df$in_step_bw[(start_new - (freq + k*rounding)):(start_new - 1)] <- step_num_bw
+                    
+                    seq_list[[seq_num]]$cor_bw <- append(seq_list[[seq_num]]$cor_bw, acf_at_freq)
+                    
+                    peak_found <- T
+                    
+                    start_old <- start_new
+                    start_new <- start_new - (freq + k*rounding)
+                  } else{  #If little periodicity/correlation: stop collecting new steps 
+                    
+                    backward <- F
+                    
+                  }                  
+                  break
+                }
+                else if (df$step_start[start_new - (freq - k*rounding)] == 1){
+                  #If enough periodicity: add step going forward
+                  #If little periodicity/correlation: stop collecting new steps
+                  
+                  acf_at_freq <- acf(df$ma_vert[(start_new - (freq - k*rounding)):start_old], lag.max = freq + k*abs(rounding), plot = F)$acf[floor((freq + freq - k*rounding)/2) + 1]
+                  
+                  if(acf_at_freq > period_thresh){
+                    step_num_bw <- step_num_bw + 1
+                    
+                    df$in_seq[(start_new - (freq - k*rounding)):(start_new - 1)] <- seq_num
+                    df$in_step_bw[(start_new - (freq - k*rounding)):(start_new - 1)] <- step_num_bw
+                    
+                    seq_list[[seq_num]]$cor_bw <- append(seq_list[[seq_num]]$cor_bw, acf_at_freq)
+                    
+                    peak_found <- T
+                    
+                    start_old <- start_new
+                    start_new <- start_new - (freq - k*rounding)
+                  } else{  #If little periodicity/correlation: stop collecting new steps 
+                    
+                    backward <- F
+                    
+                  }                  
+                  break
+                }
+                
+              }
+              
+              #Here handle case that after this for-loop still no peak found: also
+              #stop collecting new steps
+              if(peak_found == F){
+                backward <- F
+              }  
+              
+            }
+          }
+          
+          #As we are in the situation where we really did have a new sequence, and have changed the
+          #df accordingly, we can now add it to our list of sequences
+          
+          seq_list[[seq_num]]$data <- filter(df, in_seq == seq_num)
+        }
+      }
+    }
+  }
+  
+  
+  #Manipulate sequence list!!! Should be a list of dataframes. We do not need to "save" sequences, etc.
+  return(list(df, seq_list, seq_num))
 }

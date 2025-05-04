@@ -27,6 +27,17 @@ library(shiny)
 library(av)
 library(magick)
 ```
+
+##Using the application
+The approach to use the frameview application on Windows, for a video of at most 55 minutes and 33 seconds (99999 frames), is as follows: 
+1. Make a folder called frames (if you want to preserve the current infrastructure. This folder should be present with an example as well). Within this folder, add a new empty folder with a name of your choice. Say, "ExampleName" and assign it to the variable folder_name. Add the video to this folder and give it the same name as the folder (in this case ExampleName). You may want to change the scale parameter depending on the device with which the vide is taken and if it is vertical or horizontal
+2. Add a folder called "video" within the folder ExampleName, or create it using the given code. Put all video frames inside this folder at 30fps running the ffmpeg command within system. You may want to add 
+3. Run the code that creates the necessary folders from which the data will be read. This is done automatically based on the number of files in the video folder, meaning it has to be run after step 2.
+4. Find the precise starting time of the video, e.g. the observation that matches the first frame in the video. Easiest to do this is by working with part of the video and raw data to see when it matches best. A semi-automated way to do this is given below. _Add here how to do this precisely_
+5. Determine all parameters for the image-generation: what steps do you want to extract, and how do you want to display it alongside the video frames. 
+6. Run all functions. Answer
+
+
 ##Everything summary to quickly run
 
 ```{r}
@@ -36,8 +47,124 @@ shinyApp(ui = shiny_home1[[1]], server = shiny_home1[[2]])
 shinyApp(ui = shiny_tread2[[1]], server = shiny_tread2[[2]])
 ```
 
+## Everything for walkRoccoNew
 
-## Everything for walkRicco
+```{r}
+#Step 1 + 2
+folder_name <- "walkRoccoNew"
+dir.create(file.path("frames", folder_name, "video"), recursive = TRUE, showWarnings = FALSE)
+cmd <- paste0("ffmpeg -ss 00:00:00 -t 3334 -i frames/", folder_name, "/", folder_name, ".MTS -q:v 3 -vf \"fps=30,scale=600:340\" frames/", folder_name, "/video/frame_%05d.jpg")
+system(cmd)
+
+#Step 3
+vid_frames <- length(list.files(paste0("frames/", folder_name, "/video"), pattern = "\\.jpg"))
+no_of_thousands <- 1 + vid_frames %/% 1000
+for(j in 0:(no_of_thousands-1)){
+  dir.create(file.path("frames", folder_name, paste0("Sideways", j)), recursive = TRUE, showWarnings = FALSE)
+  dir.create(file.path("frames", folder_name, paste0("Forward", j)), recursive = TRUE, showWarnings = FALSE)
+  dir.create(file.path("frames", folder_name, paste0("Vertical", j)), recursive = TRUE, showWarnings = FALSE)
+  }
+
+#Step 4 (but determined with semi-automatic approach)
+start_time <- as.POSIXct("2025-01-20 10:31:19.372")
+
+#Step 5
+#Display parameters
+fw_bottom <- -Inf
+fw_top <- Inf
+vert_bottom <- -Inf
+vert_top <- Inf
+side_bottom <- -Inf
+side_top <- Inf
+fig_width <- 800
+fig_height <- 320
+fix_y <- F
+
+#Step partition parameters
+wdw_size <- 120
+ma_data <- 5
+ma_energy <- 9
+kernel_func <- ma_gauss 
+std_dev <- 1
+upright_thresh <- 0.75
+abs_acc_thresh <- 0.1 
+thresh_abs <- 0.005 
+thresh_rel <- 0.27 
+min_step_period <- 5
+max_step_period <- 40
+period_len <- 5 
+period_len_double <- 5
+period_thresh <- 0.14
+double_step_thresh <- 0.21
+thresh_direction <- 0.3
+
+
+#Step 6
+dir.create(file.path("frames", folder_name, "Averages"), recursive = TRUE, showWarnings = FALSE)
+
+data_walkRoccoNew <- generate_data(folder_name,
+                width, 
+                start_time, 
+                raw_df,
+                wdw_size,
+                ma_data,
+                ma_energy,
+                kernel_func,
+                std_dev,
+                upright_thresh,
+                abs_acc_thresh,
+                thresh_abs,
+                thresh_rel,
+                min_step_period,
+                max_step_period,
+                period_len,
+                period_len_double,
+                period_thresh,
+                double_step_thresh,
+                thresh_direction)
+
+steps_info_walkRoccoNew <- df_all_from_mvm_alt_nofilter(data_walkRoccoNew, 200, min_square_difference_vert)
+
+generate_images_avg(steps_info_walkRoccoNew, 0.8, folder_name)
+  
+generate_images(folder_name,
+                         width, 
+                         start_time, 
+                         fw_bottom,
+                         fw_top,
+                         vert_bottom,
+                         vert_top,
+                         side_bottom,
+                         side_top,
+                         fig_width,
+                         fig_height,
+                         fix_y,
+                         data_walkRoccoNew)
+
+streamvid <- "video"
+stream1 <- "Forward"
+stream2 <- "Vertical"
+stream3 <- "Sideways"
+
+shiny_walkRoccoNew <- generate_server(vid_frames,
+                         folder_name,
+                         streamvid,
+                         stream1,
+                         stream2,
+                         stream3)
+
+shinyApp(ui = shiny_walkRoccoNew[[1]], server = shiny_walkRoccoNew[[2]])
+```
+
+Semi-automated start time generator
+```{r}
+streamvid <- "raw"
+stream1 <- "X"
+stream2 <- "Y"
+stream3 <- "Z"
+```
+
+## Everything for walkRocco
 
 ```{r}
 raw_df <- Walk1

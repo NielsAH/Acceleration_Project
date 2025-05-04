@@ -1,0 +1,295 @@
+```{r, message=F, warning=F}
+#Data analysis
+library(tidyverse)
+library(latex2exp)
+library(patchwork)
+library(scales)
+library(RColorBrewer)
+
+#Working with the activity class and data files
+library(lubridate)
+library(read.gt3x)
+library(PhysicalActivity)
+
+#Solving equations
+library(nleqslv)
+library(pracma)
+library(latex2exp)
+
+#Reshaping / data manipulation
+library(reshape2)
+library(data.table)
+library(zeallot)
+
+##gganimate/creating animations
+library(gganimate)
+library(glue)
+library(shiny)
+library(av)
+library(magick)
+```
+
+##Analysis of walking test 1, using X/Y/Z example. Prototype for how it could be in functions etc.
+
+```{r}
+df_spas <- Misc3 %>% filter(time > as.POSIXct("2025-04-15 11:32:00.000") & time < as.POSIXct("2025-04-15 11:36:30.000"))
+
+param_default <- list(df_spas, 150, 1, 9, ma_gauss,
+                    0.75, 0.1, 0.001, 0.25,
+                    5, 60, 
+                    5, 3, 0.1, 
+                    0.1, 0.3, 1)
+
+c(df, wdw_size, ma_data, ma_energy, kernel_func, 
+     upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, 
+     min_step_period, max_step_period, 
+     period_len, period_len_double, period_thresh, 
+     double_step_thresh, thresh_direction, std_dev) %<-% param_default
+```
+
+```{r}
+unordered_data <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+data <- Glue_and_classify(unordered_data, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+```
+
+```{r}
+#From result of Glue_and_classify, it makes a list of steps. Can filter out cycling, certain frequencies etc. easily
+step_list <- list()
+avg_step_list_fw <- list() 
+avg_step_list_vert <- list() 
+avg_step_list_side <- list() 
+
+max_freq <- 30
+min_freq <- 0
+n <- 200
+
+for(j in 1:length(data)){
+  
+  if(data[[j]]$main_freq < max_freq & data[[j]]$main_freq > min_freq){
+      temp_avg_fw <- list()
+  temp_avg_vert <- list()
+  temp_avg_side <- list()
+  
+  min <- data[[j]]$data$in_step_bw %>% max()
+  max <- data[[j]]$data$in_step_fw %>% max()
+  
+  for(k in min:1){
+    current_step <- filter(data[[j]]$data, in_step_bw == k)
+    step_list <- append(step_list, list(current_step))
+    temp_avg_fw <- append(temp_avg_fw, list(rescale(current_step$acc_fw, n)))
+    temp_avg_vert <- append(temp_avg_vert, list(rescale(current_step$acc_vert, n)))
+    temp_avg_side <- append(temp_avg_side, list(rescale(current_step$acc_side, n)))
+  }
+  for(k in 1:max){
+    current_step <- filter(data[[j]]$data, in_step_fw == k)
+    step_list <- append(step_list, list(current_step))
+    temp_avg_fw <- append(temp_avg_fw, list(rescale(current_step$acc_fw, n)))
+    temp_avg_vert <- append(temp_avg_vert, list(rescale(current_step$acc_vert, n)))
+    temp_avg_side <- append(temp_avg_side, list(rescale(current_step$acc_side, n)))
+  }
+  
+  temp_tot_fw <- numeric(n)
+  temp_tot_vert <- numeric(n)
+  temp_tot_side <- numeric(n)
+  
+  for(l in 1:length(temp_avg_fw)){
+    temp_tot_fw <- temp_tot_fw + temp_avg_fw[[l]]
+    temp_tot_vert <- temp_tot_vert + temp_avg_vert[[l]]
+    temp_tot_side <- temp_tot_side + temp_avg_side[[l]]
+  }
+  avg_step_list_fw <- append(avg_step_list_fw, list(temp_tot_fw/length(temp_avg_fw)))
+  avg_step_list_vert <- append(avg_step_list_vert, list(temp_tot_vert/length(temp_avg_vert)))
+  avg_step_list_side <- append(avg_step_list_side, list(temp_tot_side/length(temp_avg_side)))
+  }
+}
+```
+
+```{r}
+step_data <- c()
+step_freq <- c()
+
+for(j in 1:length(step_list)){
+  step <- step_list[[j]]
+  step_fw <- rescale(step$acc_fw, n)
+  step_vert <- rescale(step$acc_vert, n)
+  step_side <- rescale(step$acc_side, n)
+  temp_data <- sum(abs(step_fw)) / (sum(abs(step_fw)) + sum(abs(step_side)) - sum(step_vert[which(step_vert < 0)]))
+  step_data <- append(step_data, temp_data)
+}
+for(k in 1:length(data)){
+  if(data[[k]]$main_freq < max_freq & data[[k]]$main_freq > min_freq){
+    step_num <- max(data[[k]]$data$in_step_bw) + max(data[[k]]$data$in_step_fw)
+    temp_freq <- rep(data[[k]]$main_freq, step_num)
+    step_freq <- append(step_freq, temp_freq) 
+  }
+}
+
+data.frame(x = 1:length(step_data), val = step_data, freq = step_freq) %>%
+  ggplot() +
+  geom_line(aes(x = x, y = ma_trunc(val, 9), colour = freq)) +
+  scale_color_viridis_c(option = "plasma") +
+  theme_minimal()
+```
+
+## Trying other metrics / generalising approach
+
+```{r}
+names <- list("walk_1", "walk_2", "walk_3", "walk_4", "walk_5", "walk_6", "walk_7", "walk_8", "walk_9", "walk_10", "spas")
+
+for(current_name in names){
+
+param_default <- list(get(paste0("df_", current_name)), 150, 1, 9, ma_gauss,
+                    0.75, 0.1, 0.001, 0.25,
+                    5, 60, 
+                    5, 3, 0.1, 
+                    0.1, 0.3, 1)
+c(df, wdw_size, ma_data, ma_energy, kernel_func, 
+     upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, 
+     min_step_period, max_step_period, 
+     period_len, period_len_double, period_thresh, 
+     double_step_thresh, thresh_direction, std_dev) %<-% param_default
+
+assign(paste0("unordered_data_", current_name), fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev))
+
+assign(paste0("data_", current_name), Glue_and_classify(get(paste0("unordered_data_", current_name)), 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1))
+}
+```
+
+```{r}
+#Temp functions, later move to other file
+efficiency_func <- function(step_fw, step_vert, step_side, ...){sum(abs(step_fw)) / (sum(abs(step_fw)) + sum(abs(step_side)) - sum(step_vert[which(step_vert < 0)]))}
+
+#Next: something with how many steps are "different" from the average, etc.
+```
+
+```{r}
+max_freq <- 30
+min_freq <- 0
+n <- 200
+
+val_function <- efficiency_func
+
+for(current_name in names){
+data <- get(paste0("data_", current_name))
+
+step_list <- list()
+avg_step_list_fw <- list()
+avg_step_list_vert <- list()
+avg_step_list_side <- list()
+
+for(j in 1:length(data)){
+  
+  if(data[[j]]$main_freq < max_freq & data[[j]]$main_freq > min_freq){
+    temp_avg_fw <- list()
+    temp_avg_vert <- list()
+    temp_avg_side <- list()
+  
+    min <- data[[j]]$data$in_step_bw %>% max()
+    max <- data[[j]]$data$in_step_fw %>% max()
+  
+  for(k in min:1){
+    current_step <- filter(data[[j]]$data, in_step_bw == k)
+    step_list <- append(step_list, list(current_step))
+    temp_avg_fw <- append(temp_avg_fw, list(rescale(current_step$acc_fw, n)))
+    temp_avg_vert <- append(temp_avg_vert, list(rescale(current_step$acc_vert, n)))
+    temp_avg_side <- append(temp_avg_side, list(rescale(current_step$acc_side, n)))
+  }
+  for(k in 1:max){
+    current_step <- filter(data[[j]]$data, in_step_fw == k)
+    step_list <- append(step_list, list(current_step))
+    temp_avg_fw <- append(temp_avg_fw, list(rescale(current_step$acc_fw, n)))
+    temp_avg_vert <- append(temp_avg_vert, list(rescale(current_step$acc_vert, n)))
+    temp_avg_side <- append(temp_avg_side, list(rescale(current_step$acc_side, n)))
+  }
+  
+  temp_tot_fw <- numeric(n)
+  temp_tot_vert <- numeric(n)
+  temp_tot_side <- numeric(n)
+  
+  for(l in 1:length(temp_avg_fw)){
+    temp_tot_fw <- temp_tot_fw + temp_avg_fw[[l]]
+    temp_tot_vert <- temp_tot_vert + temp_avg_vert[[l]]
+    temp_tot_side <- temp_tot_side + temp_avg_side[[l]]
+  }
+  avg_step_list_fw <- append(avg_step_list_fw, list(temp_tot_fw/length(temp_avg_fw)))
+  avg_step_list_vert <- append(avg_step_list_vert, list(temp_tot_vert/length(temp_avg_vert)))
+  avg_step_list_side <- append(avg_step_list_side, list(temp_tot_side/length(temp_avg_side)))
+  }
+}
+
+assign(paste0("step_list_", current_name), step_list)
+
+step_data <- c()
+step_freq <- c()
+step_cor <- c()
+
+for(j in 1:length(step_list)){
+  step <- step_list[[j]]
+  step_fw <- rescale(step$acc_fw, n)
+  step_vert <- rescale(step$acc_vert, n)
+  step_side <- rescale(step$acc_side, n)
+  temp_data <- val_function(step_fw, step_vert, step_side)
+  
+  temp_data <- sum(abs(step_fw)) / (sum(abs(step_fw)) + sum(abs(step_side)) - sum(step_vert[which(step_vert < 0)]))
+  step_data <- append(step_data, temp_data)
+}
+for(k in 1:length(data)){
+  if(data[[k]]$main_freq < max_freq & data[[k]]$main_freq > min_freq){
+    step_num <- max(data[[k]]$data$in_step_bw) + max(data[[k]]$data$in_step_fw)
+    temp_freq <- rep(data[[k]]$main_freq, step_num)
+    step_freq <- append(step_freq, temp_freq) 
+    
+    step_cor <- append(step_cor, rev(data[[k]]$cor_bw))
+    step_cor <- append(step_cor, data[[k]]$cor_fw)
+  }
+}
+
+assign(paste0("step_data_", current_name), step_data)
+assign(paste0("step_freq_", current_name), step_freq)
+assign(paste0("step_cor_", current_name), step_cor)
+}
+```
+
+```{r}
+low_cor_list <- c()
+mean_cor_list <- c()
+param <- 0.20
+
+for(name in names){
+step_data <- get(paste0("step_data_", name))
+step_freq <- get(paste0("step_freq_", name))
+step_cor <- get(paste0("step_cor_", name))
+step_selection <- ifelse(step_cor > param, 0, 1)
+  
+data.frame(x = 1:length(step_data), val = step_data, freq = step_freq) %>%
+  ggplot() +
+  geom_line(aes(x = x, y = ma_trunc(val, 1), colour = freq)) +
+  scale_color_viridis_c(option = "plasma") +
+  theme_minimal()
+
+low_cor_list <- append(low_cor_list, mean(step_selection))
+mean_cor_list <- append(mean_cor_list, mean(step_cor))
+}
+
+low_cor_list #Need better way to detect than just "low cor"
+mean_cor_list
+```
+
+## Collecting all steps for e.g. ML
+```{r}
+steps_per_df <- c()
+for(idx in 1:n){
+  assign(paste0("steps_fw_at_", idx), c())
+}
+    
+for(current_name in names){
+  steps_per_df <- append(steps_per_df, rep(current_name, length(get(paste0("step_data_", current_name)))))
+  for(idx in 1:n){
+    for(step in get(paste0("step_list_", current_name))){
+      assign(paste0("steps_fw_at_", idx), append(get(paste0("steps_fw_at_", idx)), rescale(step$acc_fw, n)[idx])) 
+    }
+  }
+}
+
+#Now try some AI or something
+```

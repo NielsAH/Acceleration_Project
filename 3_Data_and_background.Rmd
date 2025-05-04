@@ -620,3 +620,10 @@ N_video <- read.gt3x("Data_misc/N_video.gt3x")
 N_video <- as.data.frame(N_video)
 N_video$time <- force_tz(N_video$time, tzone = "Europe/Berlin")
 ```
+
+#Import more misc. (spasms)
+```{r}
+Misc3 <- read.gt3x("Data_misc/spas.gt3x")
+Misc3 <- as.data.frame(Misc3)
+Misc3$time <- force_tz(Misc3$time, tzone = "Europe/Berlin")
+```

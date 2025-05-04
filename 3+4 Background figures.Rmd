@@ -1,0 +1,89 @@
+### Importing libraries
+We first import the libraries we need.
+
+```{r, message=F, warning=F}
+#Data analysis
+library(tidyverse)
+library(patchwork)
+library(scales)
+library(RColorBrewer)
+
+#Working with the activity class and data files
+library(lubridate)
+library(read.gt3x)
+library(PhysicalActivity)
+
+#Solving equations
+library(nleqslv)
+library(pracma)
+library(latex2exp)
+```
+
+
+```{r}
+#Batten walking
+seq_walk4[[1]]$data %>% ggplot(aes(x = row, y = acc_vert, color = -in_step_fw + in_step_bw)) + geom_line()
+
+#Adult healthy walking
+seq_A20_1[[10]]$data %>% ggplot(aes(x = row, y = acc_vert, color = -in_step_fw + in_step_bw)) + geom_line()
+
+#Person with Hurler walking
+seq_S1_1[[16]]$data %>% ggplot(aes(x = row, y = acc_vert, color = -in_step_fw + in_step_bw)) + geom_line()
+
+#Healthy child running
+seq_H11_5[[33]]$data %>% ggplot(aes(x = row, y = acc_vert, color = -in_step_fw + in_step_bw)) + geom_line()
+
+for(j in 1:606){
+  if(seq_H11_5[[j]]$main_freq < 13 & seq_H11_5[[j]]$movement_type == "Walk" & nrow(seq_H11_5[[j]]$data) > 300){
+    print(j)
+    # start_time <- seq_H17_1[[j]]$data$time[1]
+    # meanY <- filter(H17_off, time > start_time & time < start_time + 10) %>% pull(Y) %>% mean()
+    # if(meanY > 0){
+    #   print(j)
+    # }
+  }
+}
+
+start_time <- as.POSIXct("2024-03-17 12:18:24.000")
+end_time <- as.POSIXct("2025-03-17 17:18:32.330")
+filter(H14_off, time > start_time & time < end_time) %>% pull(Y) %>% mean()
+```
+
+```{r}
+start_time <- as.POSIXct("2025-01-20 14:18:24.000")
+end_time <- as.POSIXct("2025-01-20 14:18:32.330")
+df <- Walk2
+start_time <- as.POSIXct("2024-10-10 08:00:21.000")
+end_time <- as.POSIXct("2024-10-10 08:00:29.330")
+df <- A20_off
+start_time <- as.POSIXct("2022-11-05 12:54:14.000")
+end_time <- as.POSIXct("2022-11-05 12:54:22.330")
+df <- S1_off
+start_time <- as.POSIXct("2024-01-10 11:54:30.000")
+end_time <- as.POSIXct("2024-01-10 11:54:38.330")
+df <- H11_off
+
+
+plot <- filter(df, time >= start_time & time < end_time) %>% 
+  ggplot(aes(x = 1:250)) +
+  geom_line(aes(y = X*9.80665, color = "Direction 1"), linewidth = 0.3) +
+  geom_line(aes(y = Y*9.80665, color = "Direction 2"), linewidth = 0.3) +
+  geom_line(aes(y = Z*9.80665, color = "Direction 3"), linewidth = 0.3) +
+  scale_color_manual(
+    name = "",
+    values = c("Direction 1" = "#56B4E9", "Direction 2" = "#D62728", "Direction 3" = "#FFCC33")
+  ) +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )')
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+ggsave("h11.png", plot, width = 10, height = 4, dpi = 300)
+```
