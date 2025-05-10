@@ -374,20 +374,20 @@ generate_images <- function(folder_name,
   
   colour_function <- function(df, idx){
     if((df$in_step_bw[idx] == 0) & (df$in_step_fw[idx] == 0)){
-      return(2)
+      return(4)
     }
     else if((df$in_step_bw[idx] %% 2 == 1) | (df$in_step_fw[idx] %% 2 == 0 & df$in_step_fw[idx] != 0)){ #Changed second from 1 to 0
-      return(3)
+      return(2)
     }
     else{
-      return(4)
+      return(3)
     }
   }
   
   alt_colour_list <- c()
   for(j in 1:frame_tot){
     if(j %% 500 == 0){
-      print(paste0("Progress: ", j/frame_tot))
+      print(paste0("Progress initialisation: ", j/frame_tot))
     }
     for(k in 1:half_width){
       alt_colour_list <- append(alt_colour_list, colour_function(temp, j - 1 + k))
@@ -404,20 +404,20 @@ generate_images <- function(folder_name,
                     value_side = val_list_side,
                     colour = alt_colour_list)
   
-  no_of_thousands <- max(new$frame) %/% 1000
+  no_of_hundreds <- max(new$frame) %/% 100
   
-  for(l in 0:no_of_thousands){
+  for(l in 0:no_of_hundreds){
     
-    frame_selection <- filter(new, frame >= 1000*l & frame < 1000*(l + 1))
+    frame_selection <- filter(new, frame >= 100*l & frame < 100*(l + 1))
     
     p_fw <- ggplot(frame_selection, aes(x = idx, y = value_fw)) +
       geom_line() +
       geom_point(aes(color = factor(colour), size = factor(colour))) +
-      scale_colour_manual(values = c("1" = "black", "2" = "#984EA3", "3" = "#009E73", "4" = "#E69F00"),
-                          labels = c("Current observation", "No activity", "Odd step pairs", "Even step pairs"),
+      scale_colour_manual(values = c("1" = "black", "2" = "#E69F00", "3" = "#009E73", "4" = "#984EA3"),
+                          labels = c("Current observation", "Odd step pairs", "Even step pairs", "No activity"),
                           name = "") +
       scale_size_manual(values = c("1" = 15, "2" = 5, "3" = 5, "4" = 5),
-                        labels = c("Current observation", "No activity", "Odd step pairs", "Even step pairs"),
+                        labels = c("Current observation", "Odd step pairs", "Even step pairs", "No activity"),
                         name = "") +
       transition_manual(frame) +
       ylim(fw_bottom, fw_top) +
@@ -438,11 +438,11 @@ generate_images <- function(folder_name,
     p_vert <- ggplot(frame_selection, aes(x = idx, y = value_vert)) +
       geom_line() +
       geom_point(aes(color = factor(colour), size = factor(colour))) +
-      scale_colour_manual(values = c("1" = "black", "2" = "#984EA3", "3" = "#009E73", "4" = "#E69F00"),
-                          labels = c("Current observation", "No activity", "Odd step pairs", "Even step pairs"),
+      scale_colour_manual(values = c("1" = "black", "2" = "#E69F00", "3" = "#009E73", "4" = "#984EA3"),
+                          labels = c("Current observation", "Odd step pairs", "Even step pairs", "No activity"),
                           name = "") +
       scale_size_manual(values = c("1" = 15, "2" = 5, "3" = 5, "4" = 5),
-                        labels = c("Current observation", "No activity", "Odd step pairs", "Even step pairs"),
+                        labels = c("Current observation", "Odd step pairs", "Even step pairs", "No activity"),
                         name = "") +
       transition_manual(frame) +
       ylim(vert_bottom, vert_top) +
@@ -463,11 +463,11 @@ generate_images <- function(folder_name,
     p_side <- ggplot(frame_selection, aes(x = idx, y = value_side)) +
       geom_line() +
       geom_point(aes(color = factor(colour), size = factor(colour))) +
-      scale_colour_manual(values = c("1" = "black", "2" = "#984EA3", "3" = "#009E73", "4" = "#E69F00"),
-                          labels = c("Current observation", "No activity", "Odd step pairs", "Even step pairs"),
+      scale_colour_manual(values = c("1" = "black", "2" = "#E69F00", "3" = "#009E73", "4" = "#984EA3"),
+                          labels = c("Current observation", "Odd step pairs", "Even step pairs", "No activity"),
                           name = "") +
       scale_size_manual(values = c("1" = 15, "2" = 5, "3" = 5, "4" = 5),
-                        labels = c("Current observation", "No activity", "Odd step pairs", "Even step pairs"),
+                        labels = c("Current observation", "Odd step pairs", "Even step pairs", "No activity"),
                         name = "") +
       transition_manual(frame) +
       ylim(side_bottom, side_top) +
@@ -487,7 +487,7 @@ generate_images <- function(folder_name,
     
     frame_num <- nrow(frame_selection)/width
     
-    print(paste0("Progress: ", l/no_of_thousands))
+    print(paste0("Progress image generation: ", l/no_of_hundreds))
     
     animate(p_fw, renderer = file_renderer(dir = paste0("frames/", folder_name, "/Forward", l), prefix = "frame_", overwrite = TRUE), fps = 1, width = fig_width, height = fig_height, nframes = frame_num)
     animate(p_vert, renderer = file_renderer(dir = paste0("frames/", folder_name, "/Vertical", l), prefix = "frame_", overwrite = TRUE), fps = 1, width = fig_width, height = fig_height, nframes = frame_num)
@@ -500,7 +500,7 @@ generate_images <- function(folder_name,
   frame_counter_vert <- 0
   frame_counter_side <- 0
   
-  for(l in 0:no_of_thousands){
+  for(l in 0:no_of_hundreds){
     dir <- paste0("frames/", folder_name, "/Forward", l)
     output_dir <- paste0("frames/", folder_name, "/Forward")
     
@@ -671,7 +671,7 @@ generate_raw_images <- function(folder_name,
                                 Y_top,
                                 Z_bottom,
                                 Z_top){
-  vid_frames <- length(list.files(paste0("frames/", folder_name, "/raw"), pattern = "\\.jpg")) 
+  vid_frames <- length(list.files(paste0("frames/", folder_name, "/video_raw"), pattern = "\\.jpg")) 
   end_time <- start_time - (1/30) + vid_frames/30 + (width - 1)*(1/30) 
   df <- filter(raw_df, time >= start_time & time <= end_time)
   
@@ -710,7 +710,7 @@ generate_raw_images <- function(folder_name,
   for(j in 1:frame_tot){
     colour_list <- append(colour_list, c(rep(0,half_width), 1, rep(0, half_width)))
   }
-  
+
   new <- data.frame(frame = frame_list, 
                     idx = idx_list, 
                     X = val_list_X, 

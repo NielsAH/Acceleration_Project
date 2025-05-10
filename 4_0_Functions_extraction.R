@@ -84,7 +84,6 @@ Big_window_manipulation <- function(df, wdw_size, ma_data, ma_energy, upright_th
   
   df$ma_Y <- ma_trunc(df$Y, n = ma_data)
   
-  
   acc_vert <- acc_vert - mean(acc_vert) #Subtracting gravity 
   
   df$acc_vert <- acc_vert
