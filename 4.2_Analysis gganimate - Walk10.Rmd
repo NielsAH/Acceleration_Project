@@ -28,12 +28,12 @@ library(av)
 library(magick)
 ```
 
-## Application to walkElvira
+## Application to walkMike
 
 ```{r}
 #Step 1 + 2
 df <- Walk3
-folder_name <- "walkElvira"
+folder_name <- "walkMike"
 dir.create(file.path("frames", folder_name), recursive = TRUE, showWarnings = FALSE)
 dir.create(file.path("frames", folder_name, "video"), recursive = TRUE, showWarnings = FALSE)
 cmd <- paste0("ffmpeg -ss 00:00:00 -t 3334 -i frames/", folder_name, "/", folder_name, ".MTS -q:v 3 -vf \"fps=30,scale=600:340\" frames/", folder_name, "/video/frame_%05d.jpg")
@@ -49,8 +49,7 @@ for(j in 0:(no_of_hundreds-1)){
   }
 
 #Step 4 (but determined with semi-automatic approach)
-start_time <-   as.POSIXct("2025-01-20 15:00:12.000")
-#Not too great, but good enough for counting steps. Possibly off by about 10 either way?
+start_time <-   as.POSIXct("2025-02-17 13:34:20.500")
 
 #Step 5
 #Display parameters
@@ -89,7 +88,7 @@ dir.create(file.path("frames", folder_name, "Forward"), recursive = TRUE, showWa
 dir.create(file.path("frames", folder_name, "Vertical"), recursive = TRUE, showWarnings = FALSE)
 dir.create(file.path("frames", folder_name, "Sideways"), recursive = TRUE, showWarnings = FALSE)
 
-data_walkElvira <- generate_data(folder_name,
+data_walkMike <- generate_data(folder_name,
                 width, 
                 start_time, 
                 df,
@@ -110,9 +109,9 @@ data_walkElvira <- generate_data(folder_name,
                 double_step_thresh,
                 thresh_direction)
 
-steps_info_walkElvira <- df_all_from_mvm_alt_nofilter(data_walkElvira, 200, min_square_difference_vert)
+steps_info_walkMike <- df_all_from_mvm_alt_nofilter(data_walkMike, 200, min_square_difference_vert)
 
-generate_images_avg(steps_info_walkElvira, 0.8, folder_name)
+generate_images_avg(steps_info_walkMike, 0.8, folder_name)
   
 generate_images(folder_name,
                          width, 
@@ -126,32 +125,32 @@ generate_images(folder_name,
                          fig_width,
                          fig_height,
                          fix_y,
-                         data_walkElvira)
+                         data_walkMike)
 
 streamvid <- "video"
 stream1 <- "Forward"
 stream2 <- "Vertical"
 stream3 <- "Sideways"
 
-shiny_walkElvira <- generate_server(vid_frames,
+shiny_walkMike <- generate_server(vid_frames,
                          folder_name,
                          streamvid,
                          stream1,
                          stream2,
                          stream3)
 
-shinyApp(ui = shiny_walkElvira[[1]], server = shiny_walkElvira[[2]])
+shinyApp(ui = shiny_walkMike[[1]], server = shiny_walkMike[[2]])
 ```
 
-## Example of finding a precise starting time, applied to walkElvira
+## Example of finding a precise starting time, applied to walkMike
 
 ```{r}
 #step 1
 raw_df <- Walk3
-raw_folder_name <- "walkElvira"
+raw_folder_name <- "walkMike"
 dir.create(file.path("frames", raw_folder_name, "video_raw"), recursive = TRUE, showWarnings = FALSE)
 
-start_vid_raw <- "00:00:00"
+start_vid_raw <- "00:01:30"
 length_vid_raw <- "15"
 cmd <- paste0(
   "ffmpeg -i frames/", raw_folder_name, "/", raw_folder_name, ".MTS ",
@@ -163,7 +162,7 @@ cmd <- paste0(
 system(cmd)
 
 #Step 2
-estimated_start_time_raw <- as.POSIXct("2025-01-20 15:00:12.000")
+estimated_start_time_raw <- as.POSIXct("2025-02-17 13:35:50.500")
 #The estimated start time of the part of the video you use to calibrate
 
 #Step 3
@@ -201,18 +200,18 @@ raw_stream3 <- "Z"
 
 raw_vid_frames <- length(list.files(paste0("frames/", folder_name, "/video_raw"), pattern = "\\.jpg"))
 
-shiny_walkElvira_raw <- generate_server(raw_vid_frames,
+shiny_walkMike_raw <- generate_server(raw_vid_frames,
                          raw_folder_name,
                          raw_streamvid,
                          raw_stream1,
                          raw_stream2,
                          raw_stream3)
 
-shinyApp(ui = shiny_walkElvira_raw[[1]], server = shiny_walkElvira_raw[[2]])
+shinyApp(ui = shiny_walkMike_raw[[1]], server = shiny_walkMike_raw[[2]])
 ```
 
 ```{r}
-frames_difference <- 14
+frames_difference <- 0
 #How many frames the figures on the left are ahead of the video on the right
 #If the figures on the left are behind, input a negative number
 
@@ -225,9 +224,9 @@ estimated_start_time_raw_new <- as.POSIXct(as.numeric(estimated_start_time_raw) 
 estimated_start_time <- as.POSIXct(as.numeric(estimated_start_time_raw_new) - seconds)
 ```
 
-## Example of finding an estimated starting time, applied to walkElvira
+## Example of finding an estimated starting time, applied to walkMike
 
 ```{r}
-temp <- filter(Walk3, time > as.POSIXct("2025-01-20 15:00:12.000"), time <  as.POSIXct("2025-01-20 15:00:21.000"))
+temp <- filter(Walk3, time > as.POSIXct("2025-02-17 13:38:50.500"), time <  as.POSIXct("2025-02-17 13:39:10.500"))
 plot(temp$Y, type = 'l')
 ```

@@ -228,6 +228,6 @@ estimated_start_time <- as.POSIXct(as.numeric(estimated_start_time_raw_new) - se
 ## Example of finding an estimated starting time, applied to walkEmma
 
 ```{r}
-temp <- filter(Walk2, time > as.POSIXct("2025-01-20 14:18:23.000"), time <  as.POSIXct("2025-01-20 14:18:30.000"))
-plot(temp$Z, type = 'l')
+temp <- filter(Walk2, time > as.POSIXct("2025-01-20 14:24:04.000"), time <  as.POSIXct("2025-01-20 14:24:40.000"))
+plot(temp$Y, type = 'l')
 ```

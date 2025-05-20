@@ -49,7 +49,7 @@ for(j in 0:(no_of_hundreds-1)){
   }
 
 #Step 4 (but determined with semi-automatic approach)
-start_time <-  as.POSIXct("2025-01-20 11:36:30.000")
+start_time <-  as.POSIXct("2025-01-20 11:37:03.666")
 #Not too great, but good enough for counting steps. Possibly off by about 10 either way?
 
 #Step 5
@@ -151,8 +151,8 @@ raw_df <- Walk1
 raw_folder_name <- "walkEstelle"
 dir.create(file.path("frames", raw_folder_name, "video_raw"), recursive = TRUE, showWarnings = FALSE)
 
-start_vid_raw <- "00:01:00"
-length_vid_raw <- "25"
+start_vid_raw <- "00:04:05"
+length_vid_raw <- "15"
 cmd <- paste0(
   "ffmpeg -i frames/", raw_folder_name, "/", raw_folder_name, ".MTS ",
   " -ss ", start_vid_raw, 
@@ -163,7 +163,7 @@ cmd <- paste0(
 system(cmd)
 
 #Step 2
-estimated_start_time_raw <- as.POSIXct("2025-01-20 11:37:30.000")
+estimated_start_time_raw <- as.POSIXct("2025-01-20 11:41:09.000")
 #The estimated start time of the part of the video you use to calibrate
 
 #Step 3
@@ -212,7 +212,7 @@ shinyApp(ui = shiny_walkEstelle_raw[[1]], server = shiny_walkEstelle_raw[[2]])
 ```
 
 ```{r}
-frames_difference <- 14
+frames_difference <- 10
 #How many frames the figures on the left are ahead of the video on the right
 #If the figures on the left are behind, input a negative number
 
@@ -229,6 +229,9 @@ estimated_start_time <- as.POSIXct(as.numeric(estimated_start_time_raw_new) - se
 
 ```{r}
 raw_df <- Walk1
-temp <- filter(Walk1, time > as.POSIXct("2025-01-20 11:37:41.000"), time <  as.POSIXct("2025-01-20 11:37:45.000"))
+start_time <-  as.POSIXct("2025-01-20 11:36:30.000")
+#Actual start time should be around 11:37:04 ?!?! Is it even correct for walk2 ??? And for the rest???
+#But this new start time makes no sense for starting walking, so maybe it is just wrong? Or does it make sense?
+temp <- filter(Walk1, time > as.POSIXct("2025-01-20 11:44:19.000"), time <  as.POSIXct("2025-01-20 11:44:29.000"))
 plot(temp$Z, type = 'l')
 ```

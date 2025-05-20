@@ -262,6 +262,8 @@ estimated_start_time <- as.POSIXct(as.numeric(estimated_start_time_raw_new) - se
 
 ```{r}
 raw_df <- Walk1
+temp <- filter(Walk1, time > as.POSIXct("2025-01-20 10:35:28.000"), time <  as.POSIXct("2025-01-20 10:35:40.800"))
+plot(temp$Y, type = 'l')
 ```
 
 
