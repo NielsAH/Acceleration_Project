@@ -1,0 +1,478 @@
+```{r, message=F, warning=F}
+#Data analysis
+library(tidyverse)
+library(latex2exp)
+library(patchwork)
+library(scales)
+library(RColorBrewer)
+
+#Working with the activity class and data files
+library(lubridate)
+library(read.gt3x)
+library(PhysicalActivity)
+
+#Solving equations
+library(nleqslv)
+library(pracma)
+library(latex2exp)
+
+#Reshaping / data manipulation
+library(reshape2)
+library(data.table)
+library(zeallot)
+
+##gganimate/creating animations
+library(gganimate)
+library(glue)
+library(shiny)
+library(av)
+library(magick)
+```
+
+# Examples all with spasm data, later generalise for more data after getting approach
+
+## General: data
+
+```{r}
+#Purely analysis of what is on video (5 seconds on both sides):
+start_time <- as.POSIXct("2025-04-15 11:34:52.099999")
+end_time <- as.POSIXct("2025-04-15 11:35:51.099999")
+df_spas_vid <- filter(Misc3, time > start_time & time < end_time)
+
+start_time <- as.POSIXct("2025-01-20 15:37:28.266666")
+end_time <- as.POSIXct("2025-01-20 15:44:28.266666")
+df_alt_vid <- filter(Walk2, time > start_time & time < end_time)
+
+df <- df_alt_vid
+
+wdw_size <- 120
+ma_data <- 5 
+ma_energy <- 5 
+kernel_func <- ma_gauss 
+std_dev <- 1
+upright_thresh <- 0.75
+abs_acc_thresh <- 0.1 
+thresh_abs <- 0.005 
+thresh_rel <- 0.25 
+min_step_period <- 5
+max_step_period <- 40
+period_len <- 5 
+period_len_double <- 5
+period_thresh <- 0.14
+double_step_thresh <- 0.21
+thresh_direction <- 0.3
+
+data_0 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, 0, 0, 0, min_step_period, max_step_period, 7, 7, 0, 0, thresh_direction, sigma = std_dev) #Quite a bit of false negatives
+data_1 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, 0.1, 0, 0.2, min_step_period, max_step_period, 6, 6, 0.05, 0.1, thresh_direction, sigma = std_dev) 
+data_2 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+data_3 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, 0.2, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+data_4 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, 0.3, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+data_5 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, 0.4, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+data_6 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, 0.5, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+
+#seq_list, time_thresh, freq_diff_thresh, min_total, wdw_size, min_highest, allow_small, hill_dominating_thresh, no_ma_fourier, kernel_fourier, ...
+ordata_0 <- Glue_and_classify(data_0, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+ordata_1 <- Glue_and_classify(data_1, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+ordata_2 <- Glue_and_classify(data_2, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+ordata_3 <- Glue_and_classify(data_3, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+ordata_4 <- Glue_and_classify(data_4, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+ordata_5 <- Glue_and_classify(data_5, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+ordata_6 <- Glue_and_classify(data_6, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+```
+
+```{r}
+pair_num <- 0
+for(j in ordata_3){
+  pair_num <- pair_num + length(j$cor_fw) + length(j$cor_bw)
+}
+pair_num
+```
+
+
+## Approach 1 + 2: getting all steps and average steps as before
+
+```{r}
+n <- 100
+rescaled_data <- df_all_from_mvm_alt_nofilter_improved(ordata_3, n, min_square_difference_vert)
+
+rescaled_data_alt <- df_all_from_mvm_alt_filter_improved(data = ordata_3, n = n, 
+                                                         start_function = min_square_difference_vert)
+
+rescaled_data <- df_all_from_mvm_alt_nofilter_improved_nocycle(data = ordata_3, n = n)
+rescaled_data <- df_all_from_mvm_alt_filter_improved_nocycle(data = ordata_3, n = n)
+
+
+rescaled_data_alt[[1]] %>% view()
+#With selection step at front, such that we only compare with other steps with similar properties
+
+```
+
+
+```{r}
+#Need to define a difference function, such as number of indices above certain difference! Or try squared difference and normal difference. Not getting logical output right now ... 
+sumabsdiff <- function(seq1, seq2){
+  return(sum(abs(seq1 - seq2)))
+}
+sumsquarediff <- function(seq1, seq2){
+  return(sum(seq1 - seq2)^2)
+}
+idc_at_distance <- function(seq1, seq2){
+  length(which(abs(seq1 - seq2) > 0.25))
+}
+max_distance <- function(seq1, seq2){
+  max(abs(seq1 - seq2))
+}
+
+dist_function <- sumabsdiff
+
+df <- as.data.frame(rescaled_data[[1]])
+df_new <- df
+
+diff_using_this_reference_fw <- numeric(nrow(df))
+
+#Try all reference values i here !!!
+for(i in 1:nrow(df)){
+  print(i)
+  rotations_list <- numeric(nrow(df))
+  abs_diff_list <- numeric(nrow(df))
+
+  reference <- unlist(df[i,])
+  step_length <- length(reference)
+
+  for(j in 1:nrow(df)){
+    current_step <- unlist(df[j,])
+    acc_differences <- numeric(step_length)
+  
+    acc_differences[1] <- dist_function(reference, current_step)
+  
+    for(k in 1:((step_length) - 1)){
+      rotated <-  c(current_step[(k + 1):step_length], current_step[1:k])
+      acc_differences[k+1] <- dist_function(reference, rotated)
+    }
+  
+    best_rot <- which.min(acc_differences) - 1
+    rotations_list[j] <- best_rot
+    abs_diff_list[j] <- min(acc_differences)
+  
+    if(best_rot == 0){
+      new_step <- current_step
+      } else{
+        new_step <- c(unlist(current_step)[(best_rot + 1):step_length],
+                    unlist(current_step)[1:(best_rot)])
+      }
+    df_new[j,] <- new_step
+  }
+  
+  diff_using_this_reference_fw[i] <- sum(abs_diff_list)
+
+}
+
+diff_using_this_reference_vert <- numeric(nrow(df))
+
+for(i in 1:nrow(df)){
+  print(i)
+  df <- as.data.frame(rescaled_data[[2]])
+  df_new <- df
+
+  rotations_list <- numeric(nrow(df))
+  abs_diff_list <- numeric(nrow(df))
+
+  reference <- unlist(df[i,])
+  step_length <- length(reference)
+
+  for(j in 1:nrow(df)){
+    current_step <- unlist(df[j,])
+    acc_differences <- numeric(step_length)
+  
+    acc_differences[1] <- dist_function(reference, current_step)
+  
+    for(k in 1:((step_length) - 1)){
+      rotated <-  c(current_step[(k + 1):step_length], current_step[1:k])
+      acc_differences[k+1] <- dist_function(reference, current_step)
+    }
+  
+    best_rot <- which.min(acc_differences) - 1
+    rotations_list[j] <- best_rot
+    abs_diff_list[j] <- min(acc_differences)
+  
+    if(best_rot == 0){
+      new_step <- current_step
+      } else{
+        new_step <- c(unlist(current_step)[(best_rot + 1):step_length],
+                    unlist(current_step)[1:(best_rot)])
+      }
+    df_new[j,] <- new_step
+  }
+  
+  diff_using_this_reference_vert[i] <- sum(abs_diff_list)
+
+}
+
+  
+#Now we know the differences every potential reference step gives, so we know the reference step that is most similar for having all other steps shifted
+
+ref_index <- which.min(diff_using_this_reference_fw + diff_using_this_reference_vert)
+```
+
+```{r}
+ref_index <- ref_index
+three_dir_df <- list()
+three_abs_diff_list <- list()
+
+for(l in 1:3){
+df <- as.data.frame(rescaled_data[[l]])
+  df_new <- df
+
+  rotations_list <- numeric(nrow(df))
+  abs_diff_list <- numeric(nrow(df))
+
+  reference <- unlist(df[ref_index,])
+  step_length <- length(reference)
+
+  for(j in 1:nrow(df)){
+    current_step <- unlist(df[j,])
+    acc_differences <- numeric(step_length)
+  
+    acc_differences[1] <- dist_function(reference, current_step)
+  
+    for(k in 1:((step_length) - 1)){
+      rotated <-  c(current_step[(k + 1):step_length], current_step[1:k])
+      acc_differences[k+1] <- dist_function(reference, rotated)
+    }
+  
+    best_rot <- which.min(acc_differences) - 1
+    rotations_list[j] <- best_rot
+    abs_diff_list[j] <- min(acc_differences)
+  
+    if(best_rot == 0){
+      new_step <- current_step
+      } else{
+        new_step <- c(unlist(current_step)[(best_rot + 1):step_length],
+                    unlist(current_step)[1:(best_rot)])
+      }
+    df_new[j,] <- new_step
+  }
+  
+  three_dir_df <- append(three_dir_df, list(df_new))
+  three_abs_diff_list <- append(three_abs_diff_list, list(abs_diff_list))
+}
+```
+
+## We only want to keep a certain fraction of the nicest steps now, where nice is compared to the mean where everything is shifted compared to the best reference point
+
+```{r}
+abs_diff_df <- three_dir_df[[2]] #fw versus vertical?!
+df_nice_fw <- three_dir_df[[1]]
+df_nice_vert <- three_dir_df[[2]]
+df_nice_side <- three_dir_df[[3]]
+
+#dist_function <- max_distance
+#dist_function <- idc_at_distance
+dist_function <- sumabsdiff
+  
+keep_per_step <- 0.95
+iterations <- 2
+alpha_val <- 0.2
+
+for(i in 1:iterations){
+  
+  average_step <- colMeans(abs_diff_df)
+  differences <- numeric(nrow(abs_diff_df))
+  for(l in 1:nrow(abs_diff_df)){
+    differences[l] <- dist_function(abs_diff_df[l,], average_step)
+    }
+  cutoff <- quantile(differences, keep_per_step)
+  good_idc <- which(differences <= cutoff)
+  df_nice_fw <- df_nice_fw[good_idc, ]
+  df_nice_vert <- df_nice_vert[good_idc, ]
+  df_nice_side <- df_nice_side[good_idc, ]
+  
+  abs_diff_df <- df_nice_vert #Or change to fw. Needed for next iteration
+}
+
+
+n <- ncol(df_nice_vert)
+colour <- "#56B4E9" # "#D62728", "#FFCC33"
+names <- c("Forward", "Vertical", "Sideways")
+temp_df <- as.data.table(df_nice_fw)
+
+colnames(temp_df) <- as.character(1:n)
+temp_df$id <- 1:nrow(temp_df)
+temp_melted = melt(temp_df, id.vars = 'id')
+temp_means <- aggregate(value ~ variable, data = temp_melted, FUN = mean)
+    
+temp_melted$variable <- as.numeric(as.character(temp_melted$variable))
+temp_means$variable <- as.numeric(as.character(temp_means$variable))
+    
+plot <- ggplot(temp_melted, aes(x = variable, y = value)) + 
+      geom_line(aes(group = id), color = colour, linewidth = 0.05, alpha = alpha_val) +
+      geom_line(data = temp_means, aes(x = variable, y = value, group = 1), 
+                color = "black", linewidth = 0.5) +
+      labs(
+        x = "Index",
+        y = TeX(r'( Acceleration in $m/s^2$ )'),
+        title = paste0("Average step ", names[j])) +
+      theme_minimal() +
+      theme(
+        text = element_text(size = 12),      
+        axis.title = element_text(size = 12),   
+        axis.text = element_text(size = 12),      
+        legend.text = element_text(size = 12),     
+        legend.title = element_text(size = 12),
+        panel.background = element_rect(fill = "white", color = NA),
+        plot.background = element_rect(fill = "white", color = NA),
+        axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()
+      )
+plot
+```
+
+##Checking what steps of a person roughly look like
+
+```{r}
+for(j in 1:100){
+  plot(unlist(three_dir_df[[2]][j,]), type = 'l')
+}
+```
+
+## Selection at front: only comparing to other steps with a few key similar properties
+
+```{r}
+
+```
+
+_____ _LINE OF NO RETURN_ ______
+
+## After determining reference point: only keeping certain fraction of nicest steps
+
+If possible storing them in same dataframe structure for quick plotting? Also determining average?
+
+```{r}
+abs_diff_list <- three_abs_diff_list[[2]] #fw versus vertical?!
+
+frac_to_keep <- 0.1
+alpha_val <- 0.3
+
+cutoff <- quantile(abs_diff_list, frac_to_keep)
+good_idc <- which(abs_diff_list <= cutoff)
+df_nice_fw <- three_dir_df[[1]][good_idc, ]
+df_nice_vert <- three_dir_df[[2]][good_idc, ]
+df_nice_side <- three_dir_df[[3]][good_idc, ]
+
+n <- ncol(df_nice_fw)
+colour <- "#56B4E9" # "#D62728", "#FFCC33"
+names <- c("Forward", "Vertical", "Sideways")
+temp_df <- as.data.table(df_nice_vert)
+
+colnames(temp_df) <- as.character(1:n)
+temp_df$id <- 1:nrow(temp_df)
+temp_melted = melt(temp_df, id.vars = 'id')
+temp_means <- aggregate(value ~ variable, data = temp_melted, FUN = mean)
+    
+temp_melted$variable <- as.numeric(as.character(temp_melted$variable))
+temp_means$variable <- as.numeric(as.character(temp_means$variable))
+    
+plot <- ggplot(temp_melted, aes(x = variable, y = value)) + 
+      geom_line(aes(group = id), color = colour, linewidth = 0.05, alpha = alpha_val) +
+      geom_line(data = temp_means, aes(x = variable, y = value, group = 1), 
+                color = "black", linewidth = 0.5) +
+      labs(
+        x = "Index",
+        y = TeX(r'( Acceleration in $m/s^2$ )'),
+        title = paste0("Average step ", names[j])) +
+      theme_minimal() +
+      theme(
+        text = element_text(size = 12),      
+        axis.title = element_text(size = 12),   
+        axis.text = element_text(size = 12),      
+        legend.text = element_text(size = 12),     
+        legend.title = element_text(size = 12),
+        panel.background = element_rect(fill = "white", color = NA),
+        plot.background = element_rect(fill = "white", color = NA),
+        axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank()
+      )
+plot
+```
+
+```{r}
+for(j in 100:200){
+  plot(unlist(three_dir_df[[2]][j,]), type = 'l')
+}
+```
+
+## Selection at front: only comparing with those with similar properties
+
+
+
+## Approach 2 failed attempt:
+```{r}
+test_fw <- align_steps_fft(as.matrix(rescaled_data[[1]]), iterations = 1)
+test_vert <- align_steps_fft(as.matrix(rescaled_data[[2]]), iterations = 1)
+test_fw$rotations
+test_vert$rotations
+
+align_steps_fft <- function(steps_matrix, iterations = 1) {
+  n_steps <- nrow(steps_matrix)
+  step_length <- ncol(steps_matrix)
+  aligned_matrix <- steps_matrix
+  rotations <- integer(n_steps)
+
+  reference <- steps_matrix[1, ]  
+
+  for (iter in 1:iterations) {
+    fft_ref <- fft(reference)
+
+    for (i in 1:n_steps) {
+      sequence <- aligned_matrix[i, ]
+      fft_seq <- fft(sequence)
+
+      cross_corr <- Re(fft(fft_ref * Conj(fft_seq), inverse = TRUE))
+      best_shift <- which.max(cross_corr) - 1
+
+      # Rotate the sequence
+      if (best_shift == 0) {
+        rotated <- sequence
+        } else {
+          rotated <- c(sequence[(best_shift + 1):step_length], sequence[1:best_shift])
+          }
+      aligned_matrix[i, ] <- rotated
+
+      # Track rotation
+      if (iter == 1) {
+        rotations[i] <- best_shift
+      } else {
+        rotations[i] <- (rotations[i] + best_shift) %% step_length
+      }
+    }
+
+    # Update reference for next iteration
+    reference <- aligned_matrix[1, ]
+    if (n_steps > 1) {
+      reference <- colMeans(aligned_matrix)
+    }
+  }
+
+  return(list(aligned = aligned_matrix, rotations = rotations))
+}
+```
+
+## Approach 3: same approach with certain fraction of steps thrown out. Only the one that fit most nicely
+
+```{r}
+
+```
+
+## Approach 3: Aligning steps to make them as similar as possible before getting average
+
+```{r}
+
+```
+
+## Approach 4: Splitting up steps into categories before computing average etc.
+
+```{r}
+
+```
