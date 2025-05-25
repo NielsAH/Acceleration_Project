@@ -19,6 +19,144 @@ library(pracma)
 library(latex2exp)
 ```
 
+## Images Fourier hills
+
+```{r}
+example_freq = seq(11, 41)
+example_energy = c(2.3,1.1,2.3,4.2, 1.5, 1.4,4.1,9,16,14,9,4,1.3,2,1.5,1,3,11,22,14,16,18,11,5,3,2,1,1.1,0.4,0.7, 0.5)
+example_energy <- example_energy/sum(example_energy)
+plot(example_energy, type = 'h')
+hills <- c("5th","4th","4th","4th", "4th", "3rd","3rd","3rd","3rd","3rd","3rd","3rd","3rd","6th","6th","1st","1st","1st","1st","1st","2nd","2nd","2nd","2nd","2nd","2nd","2nd","7th","7th","8th", "8th")
+example_df <- data.frame(colour = hills, value = example_energy, index = example_freq)
+
+example_df %>% ggplot(aes(x = index, y = value, colour = hills)) + geom_point()
+
+
+
+plot <- ggplot(example_df, aes(x = index, xend = index, y = 0, yend = value)) + geom_segment(linewidth = 1, aes(colour = colour)) +
+  scale_colour_manual(
+    values = c(
+      "1st" = "#56B4E9",
+      "2nd" = "#D62728",
+      "3rd" = "#FFCC33",
+      "4th" = "#984EA3",
+      "5th" = "#E69F00",
+      "6th" = "#009E73", 
+      "7th" = "black",
+      "8th" = "#F781BF"
+    ),
+    name = "Hill ordering"
+  ) +
+  labs(
+    x = "Frequency (per sequence)",
+    y = TeX(r'( Fraction of (mean $0$) variance explained )')
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),     
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+ggsave("fourier_hills.png", plot, width = 10, height = 4, dpi = 300)
+```
+
+## Images on result window analysis
+
+```{r}
+start_time <- as.POSIXct("2024-10-12 10:42:30.000")
+end_time <- as.POSIXct("2024-10-12 10:45:50.000")
+df <- filter(A20_off, time > start_time & time < end_time)
+
+wdw_size <- 150
+ma_data <- 5
+ma_energy <- 5
+upright_thresh <- 0.8
+abs_acc_thresh <- 0.2
+kernel_fourier <- ma_gauss
+std_dev <- 1
+
+result <- Big_window_manipulation(df, wdw_size, ma_data, ma_energy, 
+                        upright_thresh, abs_acc_thresh,
+                        kernel_fourier, sigma = std_dev)
+
+plot <- result %>% ggplot() + 
+  geom_line(aes(x = time, y = frequencies, colour = relative_frac)) +
+  scale_colour_viridis_c(option = "plasma", name = "Variance \n explained \n by first hill") +
+  labs(
+    x = "Time",
+    y = "Frequency of first Fourier hill"
+  ) +
+  ylim(0, 50) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+plot2 <- result %>% ggplot() + 
+  geom_line(aes(x = time, y = relative_frac, colour = frequencies)) +
+  scale_colour_viridis_c(option = "plasma", limits = c(10, 20), name = "Frequency \n per sequence") +
+  xlim(as.POSIXct("2024-10-12 10:44:04.000"), as.POSIXct("2024-10-12 10:44:15.000")) +
+  labs(
+    x = "Time (seconds after 10:44)",
+    y = "Variance explained \n by first Fourier hill"
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+plot3 <- result %>% ggplot() + 
+  geom_line(aes(x = time, y = absolute_frac, colour = frequencies)) +
+  scale_colour_viridis_c(option = "plasma", limits = c(10, 20), name = "Frequency \n per sequence") +
+  labs(
+    x = "Time",
+    y = "Estimated power spectral density \n in first Fourier hill"
+  ) +
+    #xlim(as.POSIXct("2024-10-12 10:43:30.000"), as.POSIXct("2024-10-12 10:45:50.000")) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+plot4 <- result %>% ggplot() + 
+  geom_line(aes(x = time, y = acc_vert, colour = frequencies)) +
+  scale_colour_viridis_c(option = "plasma", limits = c(10, 20), name = "Frequency \n per sequence") +
+  xlim(as.POSIXct("2024-10-12 10:44:04.000"), as.POSIXct("2024-10-12 10:44:15.000")) +
+  labs(
+    x = "Time (seconds after 10:44)",
+    y = "Vertical acceleration in g \n excluding gravity"
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+
+ggsave("vertical_acc.png", plot4, width = 10, height = 4, dpi = 300)
+```
+
+
+
+## Old? Do not even know what this is
 
 ```{r}
 #Batten walking

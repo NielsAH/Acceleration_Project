@@ -382,3 +382,4 @@ input <- 1:120
 fourier_approx_first_half_even(temp, input, 4) %>% plot(type = 'l')
 inverse_fourier_approx_old(temp, input, 4) %>% plot(type = 'l')
 ```
+
