@@ -155,6 +155,17 @@ ggsave("vertical_acc.png", plot4, width = 10, height = 4, dpi = 300)
 ```
 
 
+```{r}
+seq_A20_3[[40]]$len
+seq_A20_3[[40]]$data$time[1]
+energy_kernel(seq_A20_3[[40]]$data$acc_fw, 5, ma_gauss, sigma = 1) %>% plot(type = 'l')
+kern <- energy_kernel(seq_A20_3[[40]]$data$acc_fw[400:700], 5, ma_gauss, sigma = 1) 
+
+which.max(kern)
+plot(kern, type = 'h')
+
+plot(seq_A20_3[[40]]$data$acc_fw[400:700], type = 'l')
+```
 
 ## Old? Do not even know what this is
 

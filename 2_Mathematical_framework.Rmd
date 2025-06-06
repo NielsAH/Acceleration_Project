@@ -55,9 +55,9 @@ end_time <- as.POSIXct("2024-10-10 14:29:08.330")
 
 plot <- filter(A20_off, time >= start_time & time < end_time) %>% 
   ggplot(aes(x = 1:250)) +
-  geom_line(aes(y = X*9.80665, color = "Direction 1"), linewidth = 0.3) +
-  geom_line(aes(y = Y*9.80665, color = "Direction 2"), linewidth = 0.3) +
-  geom_line(aes(y = Z*9.80665, color = "Direction 3"), linewidth = 0.3) +
+  geom_line(aes(y = X*9.80665, color = "Direction 1"), linewidth = 0.5) +
+  geom_line(aes(y = Y*9.80665, color = "Direction 2"), linewidth = 0.5) +
+  geom_line(aes(y = Z*9.80665, color = "Direction 3"), linewidth = 0.5) +
   scale_color_manual(
     name = "",
     values = c("Direction 1" = "#56B4E9", "Direction 2" = "#D62728", "Direction 3" = "#FFCC33")
@@ -74,7 +74,7 @@ plot <- filter(A20_off, time >= start_time & time < end_time) %>%
     legend.text = element_text(size = 14),     
     legend.title = element_text(size = 14)     
   )
-ggsave("test.png", plot, width = 10, height = 4, dpi = 600)
+ggsave("data_example_wide_dir.png", plot, width = 10, height = 4, dpi = 300)
 ```
 
 ```{r}
@@ -95,9 +95,9 @@ df_trunc$Z <- ma_trunc(df_trunc$Z, n = 5)
 ```{r}
 plot <- filter(A20_off, time >= start_time & time < end_time) %>% 
   ggplot(aes(x = 1:250)) +
-  geom_line(aes(y = ma_trunc(X*9.80665, n = 25), color = "Direction 1"), linewidth = 0.3) +
-  geom_line(aes(y = ma_trunc(Y*9.80665, n = 25), color = "Direction 2"), linewidth = 0.3) +
-  geom_line(aes(y = ma_trunc(Z*9.80665, n = 25), color = "Direction 3"), linewidth = 0.3) +
+  geom_line(aes(y = ma_trunc(X*9.80665, n = 25), color = "Direction 1"), linewidth = 0.5) +
+  geom_line(aes(y = ma_trunc(Y*9.80665, n = 25), color = "Direction 2"), linewidth = 0.5) +
+  geom_line(aes(y = ma_trunc(Z*9.80665, n = 25), color = "Direction 3"), linewidth = 0.5) +
   scale_color_manual(
     name = "",
     values = c("Direction 1" = "#56B4E9", "Direction 2" = "#D62728", "Direction 3" = "#FFCC33")
@@ -115,7 +115,7 @@ plot <- filter(A20_off, time >= start_time & time < end_time) %>%
     legend.title = element_text(size = 14)     
   )
 
-ggsave("trunc_n25.png", plot, width = 10, height = 4, dpi = 600)
+ggsave("trunc_n25.png", plot, width = 10, height = 4, dpi = 300)
 ```
 
 ### Fourier/spectral analysis
@@ -139,13 +139,13 @@ plot <- ggplot(df, aes(x = time, y = sin)) + geom_point(colour = "#56B4E9") +
     legend.title = element_text(size = 14)    
   )
 
-ggsave("DFT1.png", plot, width = 10, height = 4, dpi = 600)
+ggsave("DFT1.png", plot, width = 10, height = 4, dpi = 300)
 
 df$abs <- fft(df$sin) %>% Mod()
 df$re <- fft(df$sin) %>% Re()
 df$im <- fft(df$sin) %>% Im()
 
-plot <- ggplot(df, aes(x = time, xend = time, y = 0, yend = im)) + geom_segment(size = 1.5, colour = "#56B4E9") +
+plot <- ggplot(df, aes(x = time, xend = time, y = 0, yend = abs)) + geom_segment(size = 1.5, colour = "#56B4E9") +
   labs(
     x = "Fourier component",
     y = "Value"
@@ -160,7 +160,7 @@ plot <- ggplot(df, aes(x = time, xend = time, y = 0, yend = im)) + geom_segment(
   )
 
 
-ggsave("DFT_im.png", plot, width = 10, height = 4, dpi = 600)
+ggsave("DFT_mod.png", plot, width = 10, height = 4, dpi = 300)
 
 
 
@@ -202,7 +202,7 @@ plot <- ggplot() +
     legend.title = element_text(size = 14)    
   )
 
-ggsave("DFT_low_high.png", plot, width = 10, height = 4, dpi = 600)
+ggsave("DFT_low_high.png", plot, width = 10, height = 4, dpi = 300)
 
 plot2 <- ggplot() + 
   geom_line(data = df_precise, aes(x = time, y = sin_alt, color = "High frequency fit"), linewidth = 1) +
@@ -225,7 +225,7 @@ plot2 <- ggplot() +
     legend.title = element_text(size = 14)    
   )
 
-ggsave("DFT_high_zoomed.png", plot2, width = 10, height = 4, dpi = 600)
+ggsave("DFT_high_zoomed.png", plot2, width = 10, height = 4, dpi = 300)
 ```
 
 Now we apply the ideas of scaling the Fourier transform to the original data.
@@ -251,7 +251,7 @@ plot <- filter(A20_off, time >= start_time & time < end_time) %>%
     legend.title = element_text(size = 14)     
   )
 
-ggsave("data_vert.png", plot, width = 10, height = 4, dpi = 600)
+ggsave("data_vert.png", plot, width = 10, height = 4, dpi = 300)
 
 df <- filter(A20_off, time >= start_time & time < end_time) 
 spec <- df$Y %>% fft() %>% Mod()
@@ -273,7 +273,7 @@ plot2 <- ggplot(spec_df, aes(x = comp, xend = comp, y = 0, yend = val)) + geom_s
     legend.title = element_text(size = 14)     
   )
 
-ggsave("data_vert_spec.png", plot2, width = 10, height = 4, dpi = 600)
+ggsave("data_vert_spec.png", plot2, width = 10, height = 4, dpi = 300)
 
 #For fraction of variance explained:
 order <- spec_df$val %>% order(decreasing = "T")
@@ -359,14 +359,62 @@ plot125 <-  ggplot() +
     legend.text = element_text(size = 14),     
     legend.title = element_text(size = 14)
   )
-ggsave("reconstruction1.png", plot1, width = 10, height = 4, dpi = 600)
-ggsave("reconstruction2.png", plot2, width = 10, height = 4, dpi = 600)
-ggsave("reconstruction3.png", plot3, width = 10, height = 4, dpi = 600)
-ggsave("reconstruction5.png", plot5, width = 10, height = 4, dpi = 600)
-ggsave("reconstruction10.png", plot10, width = 10, height = 4, dpi = 600)
-ggsave("reconstruction20.png", plot20, width = 10, height = 4, dpi = 600)
-ggsave("reconstruction50.png", plot50, width = 10, height = 4, dpi = 600)
-ggsave("reconstruction125.png", plot125, width = 10, height = 4, dpi = 600)
+ggsave("reconstruction1.png", plot1, width = 10, height = 4, dpi = 300)
+ggsave("reconstruction2.png", plot2, width = 10, height = 4, dpi = 300)
+ggsave("reconstruction3.png", plot3, width = 10, height = 4, dpi = 300)
+ggsave("reconstruction5.png", plot5, width = 10, height = 4, dpi = 300)
+ggsave("reconstruction10.png", plot10, width = 10, height = 4, dpi = 300)
+ggsave("reconstruction20.png", plot20, width = 10, height = 4, dpi = 300)
+ggsave("reconstruction50.png", plot50, width = 10, height = 4, dpi = 300)
+ggsave("reconstruction125.png", plot125, width = 10, height = 4, dpi = 300)
+```
+
+## Example autocovariance instead of energy
+
+```{r}
+val_list <- c()
+for(j in -1000:1000){
+  if(abs(j) <= 2){
+    val_list <- append(val_list, 0)
+  } 
+  else if(((abs(j) %% 8) == 3) | ((abs(j) %% 8) == 5)){
+    val_list <- append(val_list, sign(j))
+  }
+    else if(((abs(j) %% 8) == 1) | ((abs(j) %% 8) == 7)){
+    val_list <- append(val_list, sign(-j))
+    }
+      else if(((abs(j) %% 8) == 4)){
+    val_list <- append(val_list, 2*sign(j))
+      }
+        else if(((abs(j) %% 8) == 0)){
+    val_list <- append(val_list, 2*sign(-j))
+        }
+      else if(((abs(j) %% 8) == 2) | ((abs(j) %% 8) == 6)){
+    val_list <- append(val_list, 0)
+    }
+}
+
+df <- data.frame(val = val_list, idx = -1000:1000)
+
+df %>% 
+  ggplot(aes(x = idx)) +
+  geom_point(aes(y = val), color = "#D62728", size = 2) +
+  geom_line(aes(y = val), color = "red", linewidth = 0.5) +
+  labs(
+    x = "Index",
+    y = "Value"
+  ) +
+  xlim(-30, 30) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+acf(val_list)
 ```
 
 

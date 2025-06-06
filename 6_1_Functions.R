@@ -6,7 +6,6 @@ rescale_improved <- function(step, size){
 
 ma_cyclic <- function(vec,n){
   len <- length(vec)
-
   half <- (n - 1)/2
   
   # Create output vector
@@ -472,3 +471,173 @@ df_all_from_mvm_alt_filter_improved_nocycle <- function(data, n,
     
     return(list(fw_df, vert_df, side_df, step_data))
 }
+
+#Getting out all steps without reorientation yet
+full_steps <- function(data, n, filter_function){
+  all_fw_steps <- list()
+  all_vert_steps <- list()
+  all_side_steps <- list()
+  
+  step_data <- list(mvm = c())
+  
+  mvm_num <- 0
+  
+  for(mvm in data){
+    if(filter_function(mvm)){
+    
+    mvm_fw_steps <- list()
+    mvm_vert_steps <- list()
+    mvm_side_steps <- list()
+    
+    end_bw <- max(mvm$data$in_step_bw)
+    end_fw <- max(mvm$data$in_step_fw)
+    
+    for(j in end_bw:1){ #To go from earliest to latest step
+      step <- filter(mvm$data, in_step_bw == j)
+      
+      new_fw <- rescale_improved(step$acc_fw, n)
+      new_vert <- rescale_improved(step$acc_vert, n)
+      new_side <- rescale_improved(step$acc_side, n)
+      
+      mvm_fw_steps <- append(mvm_fw_steps, list(new_fw))
+      mvm_vert_steps <- append(mvm_vert_steps, list(new_vert))
+      mvm_side_steps <- append(mvm_side_steps, list(new_side))
+    }
+    
+    for(j in 1:end_fw){
+      step <- filter(mvm$data, in_step_fw == j)
+      
+      new_fw <- rescale_improved(step$acc_fw, n)
+      new_vert <- rescale_improved(step$acc_vert, n)
+      new_side <- rescale_improved(step$acc_side, n)
+      
+      mvm_fw_steps <- append(mvm_fw_steps, list(new_fw))
+      mvm_vert_steps <- append(mvm_vert_steps, list(new_vert))
+      mvm_side_steps <- append(mvm_side_steps, list(new_side))
+    }
+    
+    for(step in mvm_fw_steps){
+      all_fw_steps <- append(all_fw_steps, list(step))
+      step_data$mvm <- append(step_data$mvm, mvm_num)
+    }
+    for(step in mvm_vert_steps){
+      all_vert_steps <- append(all_vert_steps, list(step))
+    }
+    for(step in mvm_side_steps){
+      all_side_steps <- append(all_side_steps, list(step))
+    }
+    mvm_num <- mvm_num + 1
+    }
+  }
+  fw_df <- rbindlist(lapply(all_fw_steps, as.list))
+  vert_df <- rbindlist(lapply(all_vert_steps, as.list))
+  side_df <- rbindlist(lapply(all_side_steps, as.list))
+  #side_df <- as.data.frame(do.call(rbind, all_steps))
+  return(list(fw_df, vert_df, side_df, step_data))
+}
+
+full_steps_old <- function(data, n, filter_function){
+  all_fw_steps <- list()
+  all_vert_steps <- list()
+  all_side_steps <- list()
+  
+  step_data <- list(mvm = c())
+  
+  mvm_num <- 0
+  
+  for(mvm in data){
+    if(filter_function(mvm)){
+      
+      mvm_fw_steps <- list()
+      mvm_vert_steps <- list()
+      mvm_side_steps <- list()
+      
+      end_bw <- max(mvm$data$in_step_bw)
+      end_fw <- max(mvm$data$in_step_fw)
+      
+      for(j in 1:end_bw){ 
+        step <- filter(mvm$data, in_step_bw == j)
+        
+        new_fw <- rescale_improved(step$acc_fw, n)
+        new_vert <- rescale_improved(step$acc_vert, n)
+        new_side <- rescale_improved(step$acc_side, n)
+        
+        mvm_fw_steps <- append(mvm_fw_steps, list(new_fw))
+        mvm_vert_steps <- append(mvm_vert_steps, list(new_vert))
+        mvm_side_steps <- append(mvm_side_steps, list(new_side))
+      }
+      
+      for(j in 1:end_fw){
+        step <- filter(mvm$data, in_step_fw == j)
+        
+        new_fw <- rescale_improved(step$acc_fw, n)
+        new_vert <- rescale_improved(step$acc_vert, n)
+        new_side <- rescale_improved(step$acc_side, n)
+        
+        mvm_fw_steps <- append(mvm_fw_steps, list(new_fw))
+        mvm_vert_steps <- append(mvm_vert_steps, list(new_vert))
+        mvm_side_steps <- append(mvm_side_steps, list(new_side))
+      }
+      
+      for(step in mvm_fw_steps){
+        all_fw_steps <- append(all_fw_steps, list(step))
+        step_data$mvm <- append(step_data$mvm, mvm_num)
+      }
+      for(step in mvm_vert_steps){
+        all_vert_steps <- append(all_vert_steps, list(step))
+      }
+      for(step in mvm_side_steps){
+        all_side_steps <- append(all_side_steps, list(step))
+      }
+      mvm_num <- mvm_num + 1
+    }
+  }
+  fw_df <- rbindlist(lapply(all_fw_steps, as.list))
+  vert_df <- rbindlist(lapply(all_vert_steps, as.list))
+  side_df <- rbindlist(lapply(all_side_steps, as.list))
+  #side_df <- as.data.frame(do.call(rbind, all_steps))
+  return(list(fw_df, vert_df, side_df, step_data))
+}
+
+
+#Getting out all data on distances and which orientation used given column and function
+full_groups <- function(acc_df, cluster_function){
+  no_steps <- nrow(acc_df)
+  n <- ncol(acc_df)
+  
+  distance_df <- as.data.frame(matrix(0, nrow = no_steps, ncol = no_steps))
+  starting_entry_df <- as.data.frame(matrix(0, nrow = no_steps, ncol = no_steps))
+  
+  for(i in 1:no_steps){
+    current_step <- unlist(acc_df[i,])
+    
+    if(i %% 10 == 0){
+      print(paste0("Progress: ", i/no_steps))
+    }
+    
+    for(j in 1:no_steps){
+      new_step <- unlist(acc_df[j,])
+      
+      differences_vec <- c()
+      
+      for(k in 1:n){
+        if(k == 1){
+          shifted_step <- new_step
+        }
+        else if(k > 1){
+        shifted_step <- c(new_step[k:n], new_step[1:(k-1)])
+        }
+        
+        difference <- cluster_function(current_step, shifted_step)
+        differences_vec <- append(differences_vec, difference)
+      }
+      
+      distance_df[i,j] <- min(differences_vec)
+      starting_entry_df[i,j] <- which.min(differences_vec)
+    }
+  }
+  
+  return(list(distance_df, starting_entry_df))
+  
+}
+
