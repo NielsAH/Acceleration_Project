@@ -69,4 +69,4 @@ I welcome anyone to do so for the following reasons.
 - You cannot replicate any computations mentioned in the thesis that you are interested in.
 - You have found a privacy or safety concern within my data.
 - You have questions about the missing data in the code, or other data mentioned in the thesis. We can discuss which data can be shared through consulation with the WKZ/UMC.
-- You have any other question about the code or thesis.
+- You have any other question, remarks or suggestions about the code or thesis.
