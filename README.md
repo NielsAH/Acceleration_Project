@@ -4,7 +4,7 @@
 This GitHub page is used to share the code and computations to the thesis project on accelerometer data. 
 It also includes example clustering using 4-medoids, using a least squares MDS visualisation into three dimensions for different dissimilariaties, as described in the thesis. These can be found in the Section 5 medoid folder.
 All other code is also roughly included by section. However, the files have not been reorganised. Some of the code did not make the thesis, and some of the code for images in the thesis can be at surprising places. 
-Only one data example file is included, other raw data files have been omitted due to privacy concerns and file size.
+Only one data example file is included, other raw data files have been omitted due to privacy concerns and file size (and are not part of this project's history either).
 
 ## Required packages / dependencies
 Several CRAN R packages have been included in this project. They need to be installed for at least some code to work.
