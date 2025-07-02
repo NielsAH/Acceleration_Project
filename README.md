@@ -6,7 +6,7 @@ It also includes example clustering using 4-medoids, using a least squares MDS v
 All other code is also roughly included by section. However, the files have not been reorganised. Some of the code did not make the thesis, and some of the code for images in the thesis can be at surprising places. 
 Only one data example file is included, other raw data files have been omitted due to privacy concerns and file size.
 
-## Required R packages / dependencies
+## Required packages / dependencies
 Several CRAN R packages have been included in this project. They need to be installed for at least some code to work.
 
 <details>
