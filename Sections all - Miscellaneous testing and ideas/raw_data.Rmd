@@ -1,0 +1,185 @@
+### Importing libraries
+
+```{r, message=F, warning=F}
+library(tidyverse)
+#remotes::install_github("THLfi/read.gt3x")
+#install.packages("lubridate")
+library(lubridate)
+library(read.gt3x)
+```
+
+### Importing data
+```{r}
+raw_1 <- read.gt3x("Data3/1 (2024-10-16).gt3x")
+```
+
+### Investiging data
+
+```{r}
+attributes(raw_1)$header
+```
+
+```{r}
+attributes(raw_1)[setdiff(names(attributes(raw_1)), c("dim", "dimnames", "time_index"))]
+```
+
+```{r}
+df_1 <- as.data.frame(raw_1)
+df_1$time <- force_tz(df_1$time, tzone = "Europe/Berlin")
+view(df_1)
+```
+
+```{r}
+df_1_sat <- df_1[5616001:6822001,]
+```
+
+Example how to filter out specific times. Note that the time zone needs to be changed for it to be accurate: seems to think the observations are in GMT, but they are not (has been checked). 
+
+```{r}
+
+temp <- df_1[10000:10100,]
+
+#temp$time <- as.POSIXct(temp$time, format = "%Y-%m-%d %H:%M:%OS")
+
+#temp$time <- force_tz(temp$time, tzone = "Europe/Berlin")
+
+start_time <- as.POSIXct("2024-10-10 06:00:00.000")
+end_time <- as.POSIXct("2024-10-10 06:45:00.000")
+
+rest_1 <- df_1 %>%
+  filter(time >= start_time & time <= end_time)
+
+mean(rest_1$X)
+mean(rest_1$Y)
+mean(rest_1$Z)
+
+start_time <- as.POSIXct("2024-10-10 20:45:00.000")
+end_time <- as.POSIXct("2024-10-11 08:00:00.000")
+
+rest_2 <- df_1 %>%
+  filter(time >= start_time & time <= end_time)
+
+mean(rest_2$X)
+mean(rest_2$Y)
+mean(rest_2$Z)
+
+start_time <- as.POSIXct("2024-10-11 22:30:00.000")
+end_time <- as.POSIXct("2024-10-12 09:45:00.000")
+
+rest_3 <- df_1 %>%
+  filter(time >= start_time & time <= end_time)
+
+mean(rest_3$X)
+mean(rest_3$Y)
+mean(rest_3$Z)
+
+#Now move on to walking
+
+start_time <- as.POSIXct("2024-10-10 08:22:00.000")
+end_time <- as.POSIXct("2024-10-10 08:28:00.000")
+
+walk_1 <- df_1 %>%
+  filter(time >= start_time & time <= end_time)
+
+mean(walk_1$X)
+mean(walk_1$Y)
+mean(walk_1$Z)
+
+start_time <- as.POSIXct("2024-10-10 09:37:00.000")
+end_time <- as.POSIXct("2024-10-10 09:43:00.000")
+
+walk_2 <- df_1 %>%
+  filter(time >= start_time & time <= end_time)
+
+mean(walk_2$X)
+mean(walk_2$Y)
+mean(walk_2$Z)
+
+start_time <- as.POSIXct("2024-10-10 14:20:00.000")
+end_time <- as.POSIXct("2024-10-10 14:34:00.000")
+
+walk_3 <- df_1 %>%
+  filter(time >= start_time & time <= end_time)
+
+mean(walk_3$X)
+mean(walk_3$Y)
+mean(walk_3$Z)
+
+start_time <- as.POSIXct("2024-10-14 12:54:00.000")
+end_time <- as.POSIXct("2024-10-14 12:57:00.000")
+
+walk_4 <- df_1 %>%
+  filter(time >= start_time & time <= end_time)
+
+mean(walk_4$X)
+mean(walk_4$Y)
+mean(walk_4$Z)
+
+start_time <- as.POSIXct("2024-10-14 17:05:00.000")
+end_time <- as.POSIXct("2024-10-14 17:10:00.000")
+
+walk_5 <- df_1 %>%
+  filter(time >= start_time & time <= end_time)
+
+mean(walk_5$X)
+mean(walk_5$Y)
+mean(walk_5$Z)
+
+start_time <- as.POSIXct("2024-10-12 11:56:00.000")
+end_time <- as.POSIXct("2024-10-12 12:20:00.000")
+
+cycle_1 <- df_1 %>%
+  filter(time >= start_time & time <= end_time)
+
+mean(cycle_1$X)
+mean(cycle_1$Y)
+mean(cycle_1$Z)
+
+start_time <- as.POSIXct("2024-10-12 12:20:00.000")
+end_time <- as.POSIXct("2024-10-12 12:40:00.000")
+
+cycle_2 <- df_1 %>%
+  filter(time >= start_time & time <= end_time)
+
+mean(cycle_2$X)
+mean(cycle_2$Y)
+mean(cycle_2$Z)
+
+start_time <- as.POSIXct("2024-10-12 17:12:00.000")
+end_time <- as.POSIXct("2024-10-12 17:28:00.000")
+
+cycle_3 <- df_1 %>%
+  filter(time >= start_time & time <= end_time)
+
+mean(cycle_3$X)
+mean(cycle_3$Y)
+mean(cycle_3$Z)
+
+start_time <- as.POSIXct("2024-10-12 17:40:00.000")
+end_time <- as.POSIXct("2024-10-12 17:52:00.000")
+
+cycle_4 <- df_1 %>%
+  filter(time >= start_time & time <= end_time)
+
+mean(cycle_4$X)
+mean(cycle_4$Y)
+mean(cycle_4$Z)
+
+start_time <- as.POSIXct("2024-10-12 10:17:00.000")
+end_time <- as.POSIXct("2024-10-12 10:42:00.000")
+
+run_1 <- df_1 %>%
+  filter(time >= start_time & time <= end_time)
+
+mean(run_1$X)
+mean(run_1$Y)
+mean(run_1$Z)
+```
+
+
+
+### Cleaning data
+
+```{r}
+view(df_1_sat)
+```

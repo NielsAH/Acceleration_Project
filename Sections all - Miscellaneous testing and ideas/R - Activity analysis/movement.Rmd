@@ -1,0 +1,89 @@
+### Imports
+
+```{r, message=F, warning=F}
+library(tidyverse)
+```
+
+Note the re-numbering. 
+
+```{r, warning=F, message=F}
+df_1 <- read_csv("Data/1555457 (2022-11-23)1secDataTable.csv", skip=10)
+df_2 <- read_csv("Data/2560592 (2023-06-26)1secDataTable.csv", skip=10)
+df_3 <- read_csv("Data/2852239 (2023-09-18)1secDataTable.csv", skip=10)
+df_4 <- read_csv("Data/5680601 (2023-04-26)1secDataTable.csv", skip=10)
+df_5 <- read_csv("Data/6611237 (2023-06-07)1secDataTable.csv", skip=10)
+df_6 <- read_csv("Data/6900685 (2023-04-12)1secDataTable.csv", skip=10)
+df_7 <- read_csv("Data/7900686 (2023-04-12)1secDataTable.csv", skip=10)
+df_8 <- read_csv("Data/9560577 (2023-10-23)1secDataTable.csv", skip=10)
+df_9 <- read_csv("Data/Sem (2022-10-12)1secDataTable.csv", skip=10)
+
+```
+
+### Cleaning data
+
+_To do: remove lux, change date so that is really recognises as a date (merge the first two columns to do so)_
+
+```{r}
+ma <- function(x, n = 15){stats::filter(x, rep(1/n, n), sides = 2)}
+
+#Not a bad idea to only select some columns
+pt1_df1 <- df_1 %>% 
+  mutate(idx = as.numeric(row.names(.))) %>%
+  mutate(vel_hor = mapply(function(x,y,z) norm(c(x,y), type = "2"), Axis1[1:nrow(.)], Axis2[1:nrow(.)])) %>%
+  mutate(vel_tot = mapply(function(x,y,z) norm(c(x,y,z), type = "2"), Axis1[1:nrow(.)], Axis2[1:nrow(.)], Axis3[1:nrow(.)])) %>%
+  mutate(ma_vel_tot = ma(vel_tot))
+
+view(pt1_df1)
+
+pt2_df1 <- df_2 %>% 
+  mutate(idx = as.numeric(row.names(.))) %>%
+  mutate(vel_hor = mapply(function(x,y,z) norm(c(x,y), type = "2"), Axis1[1:nrow(.)], Axis2[1:nrow(.)])) %>%
+  mutate(vel_tot = mapply(function(x,y,z) norm(c(x,y,z), type = "2"), Axis1[1:nrow(.)], Axis2[1:nrow(.)], Axis3[1:nrow(.)])) %>%
+  mutate(ma_vel_tot = ma(vel_tot))
+```
+
+### Activity partition approach: moving average 
+
+One example of a definition: active periods are sequences at which the patient has been active enough near that time, thus the moving average of binary activity is at least a certain threshold value. Indeed, if the value is below,we either have very sporadic movements, or no movements at all. 
+We then assign a partition number to each active period and 0s to other times. _Although we still may want to change this definition to skip leading inactivity._
+
+```{r}
+#Function that takes a data-frame, and adds a binary "activity value" and a moving average of this activity value, as well as a partition into parts based on this moving average.
+pt1_df2 <- add_ma_act_part(pt1_df1, pt1_df1$vel_tot, 25, 0.25)
+
+pt2_df2 <- add_ma_act_part(pt2_df1, pt2_df1$vel_tot, 25, 0.25)
+```
+
+```{r}
+pt1_df2 %>% 
+  filter(part == 400) %>% 
+  ggplot(aes(x = idx, y = vel_tot)) +
+  geom_point()
+```
+
+### Activity partition approach: hard bounds
+
+The moving average approach takes leading zeroes, and sometimes we have a lot of low activity before the actual active periods we would want to measure start. A different definition would be counting a period as active once we have a few non-zero acceleration values in a row, and then ending the period when we have a few zero acceleration values in a row. 
+
+```{r}
+pt1_df3 <- add_hard_act_part(pt1_df1, pt1_df1$vel_tot, 10, 10)
+max(pt1_df3$part)
+
+pt2_df3 <- add_hard_act_part(pt2_df1, pt2_df1$vel_tot, 10, 10)
+```
+
+
+```{r}
+length(filter(pt1_df3, part == 400)$vel_tot)
+```
+
+```{r}
+pt1_df3 %>% 
+  filter(part == 400) %>% 
+  ggplot(aes(x = idx, y = vel_tot)) +
+  geom_point()
+```
+
+Still check results at some point, as I have changed it by putting it into function again a bit, possibly. 
+
+

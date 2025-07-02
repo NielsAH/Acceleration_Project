@@ -1,0 +1,7 @@
+### Importing libraries
+
+```{r, message=F, warning=F}
+library(tidyverse)
+```
+
+We get the dataframe 'df' from the cleaning and importing file. It should contain the full raw data, as well as extra labels from both the movement logbook and epoch data.  

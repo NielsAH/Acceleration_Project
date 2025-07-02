@@ -1,0 +1,363 @@
+### Importing libraries
+
+```{r, message=F, warning=F}
+library(tidyverse)
+library(patchwork)
+library(cheapr) #For e.g. scm
+```
+
+```{r}
+start_idx <- 910000 #Walk
+stop_idx <-  927000 #Walk
+start_idx <- 6436351 #Cycle
+stop_idx <- 6471301 #Cycle
+start_idx <- 4172500 #Car
+stop_idx <- 4208400 #Car
+start_idx <- 5644150 #Run 
+stop_idx <- 5695381 #Run
+```
+
+```{r}
+start_idx <- 910801
+stop_idx <- 925201
+temp <- df_part_trim[start_idx:stop_idx,3] %>% scale()
+N <- length(temp)
+spec <- alt_fft(temp)
+spec %>% plot(type = "h")
+
+#Continue here 03-12 and 04-12, finally normalisation works correctly
+#Test that indeed the proportions, energy within certain components, works as well now
+```
+
+Step 1: consider what the occurring frequencies are in the spectrum on a large scale. We use the "determine_hills" function which works on "alt_fft" spectrums. Following two inputs need to be considered carefully:
+- Hill_thresh: Could for example be determined based on variance, or if proportion with ma_peak is higher or lower than proportion with mean values, etc. Should be dependent on the total length of the spectrum (e.g. of the mean value) though. Using constant times mean it will be harsh on shorter spectrums
+- Hill_significance: when is a hill as a whole significant? Note that we already only include values in the hill for which ma is high enough, so not risk that the hill just grows very big. Not clear if it should have some dependence on length of the hill/spectrum as well. 
+
+```{r}
+hills <- determine_hills(5, spec, 0.0005, 0.05)
+```
+
+We can now determine the weighted mean value for both, and through this the middle index and thus the corresponding frequency.
+
+```{r}
+movement_frequencies <- c()
+
+for(hill in hills){
+  hill_values <- spec[hill]
+  hill_centre <- (min(hill) - 1 + (sum(hill_values*(1:length(hill_values)))/sum(hill_values))) #Can round, but do not even have to I think
+  hill_freq <- (N)/hill_centre #We divide by hill_centre and not hill_centre minus 1, as we already removed DC component in computing the alt_spec
+  movement_frequencies <- append(movement_frequencies, hill_freq)
+}
+```
+
+---
+
+We now apply these findings to an example, to see how consistent this maximum frequency is in periodic data and noisy data.
+
+```{r}
+N <- 601 #Show consistent/stable under this parameter as well? Don't know to what extent it is
+period_wdw <- (N-1)/2
+
+ma_wdw_spec <- 5 #Show consistent/stable under this parameter
+hill_thresh <- 3/period_wdw #Show consistent/stable under this parameter
+hill_significance <- 0.05 #Show consistent/stable under this parameter
+  
+start_idx <- 910801 #Walk
+stop_idx <- 925201 #Walk
+
+start_idx <- 6406469 #Cycle
+stop_idx <- 6420091 #Cycle
+
+start_idx <- 3928501 #Car
+stop_idx <-  3956401 #Car
+
+start_idx <- 270000 #Stair_segment
+stop_idx <- 290000 #Stair_segment
+
+start_idx <- 305000 #Test brief walk
+stop_idx <-  315000 #Test
+  
+data <- df_part_trim[start_idx:stop_idx,3]
+data_scaled <- df_part_trim[start_idx:stop_idx,3] %>% scale()
+#Scaling immediately could be problematic, although needed for ways hills are detected now
+
+main_frequencies <- numeric(length(data_scaled) - 2*period_wdw)
+second_frequencies <- numeric(length(data_scaled) - 2*period_wdw)
+third_frequencies <- numeric(length(data_scaled) - 2*period_wdw)
+
+for(j in (period_wdw + 1):(length(data_scaled) - period_wdw)){
+  spec <- alt_fft(data_scaled[(j - period_wdw):(j + period_wdw)])
+  hills <- determine_hills(ma_wdw_spec, spec, hill_thresh, hill_significance)
+  
+  frequencies <- get_hill_frequencies(spec, hills, N)
+
+  main_frequencies[j - period_wdw] <- ifelse(is.null(frequencies[1]), 0, frequencies[1])
+  #Need this weird if statement here, because apparently if frequencies has just one element,
+  #then frequencies[2] and [3] are counted as NA and not as null
+  if(is.null(frequencies[1])){
+    second_frequencies[j - period_wdw] <- ifelse(is.null(frequencies[2]), 0, frequencies[2])
+    third_frequencies[j - period_wdw] <- ifelse(is.null(frequencies[3]), 0, frequencies[3])
+  }
+  else{
+    second_frequencies[j - period_wdw] <- ifelse(is.na(frequencies[2]), 0, frequencies[2])
+    third_frequencies[j - period_wdw] <- ifelse(is.na(frequencies[3]), 0, frequencies[3])
+  }
+  #Still generates NA values that should be 0. I don't see where the NA values are coming from. I would think either frequencies[1] is null, or it contains some value.
+
+}
+
+plot(main_frequencies, type = "l")
+plot(second_frequencies, type = "l")
+plot(third_frequencies, type = "l")
+```
+
+Now that we know the main frequency, we can both zoom in more to see where the movement with that frequency starts/stops, and we can use it to see if we have a periodic movement at all. There's two approaches, either through some LCM just determine if one strong movement at every point, or first use the big scale to see where continuously some movement appears, and then either only looking at those on small scale, or even just trying to find stopping point and starting point of signal (but not advisable, as it will pick up pauses and we want to extract double-steps).
+
+Our first approach will be from mainly the main_frequency, get out periods during which one movement dominates, and then seeing if there is a second_frequency and third_frequency consistent throughout that period as well. 
+
+```{r}
+ma_wdw_raw <- 5
+ma_wdw_diff <- 25
+thresh_change <- 1/100 #How to determine? Thought 1/N made sense, but due to ways hill are chosen it may shift a lot more unexpectedly 
+#This can be seen (maybe) as a way to decide how certain we want to be that we do not classify different movements as the same, where the trade-off is missing out on movements. Other parameters can be described similarly.
+
+data_ma <- ma(data_scaled, n = ma_wdw_raw)
+
+#Define a data frame which only contains data for which we could compute the frequency values
+central_df <- data.frame(idx = 1:(length(data_scaled) - 2*period_wdw), data_scaled = data_scaled[(period_wdw + 1):(length(data_scaled) - period_wdw)], data_ma = data_ma[(period_wdw + 1):(length(data_scaled) - period_wdw)], main_freq = main_frequencies, second_freq = second_frequencies, third_freq = third_frequencies)
+
+central_df <- mutate(central_df, main_freq_diff = c(0, diff(main_frequencies)))
+central_df <- mutate(central_df, second_freq_diff = c(0, diff(second_frequencies)))
+central_df <- mutate(central_df, third_freq_diff = c(0, diff(third_frequencies)))
+
+central_df <- mutate(central_df, main_freq_diff_ma = ma(abs(main_freq_diff), n = ma_wdw_diff))
+#Instead of approach with main_freq_diff_ma above limit, we may want to extract periods in which variance is limited or sth like that
+
+central_df <- mutate(central_df, consistent_values = ifelse(main_freq_diff_ma > thresh_change, 0, 1))
+
+central_df <- mutate(central_df, movement_num = with(rle(ifelse(is.na(central_df$consistent_values), 0, central_df$consistent_values != 0)), inverse.rle(list(values = ifelse(values, cumsum(values), 0), lengths = lengths)) * (!is.na(central_df$consistent_values) & central_df$consistent_values != 0)))
+
+
+peakness <- c(0, diff(sign(diff(data_ma))), 0)
+is_peak <- ifelse(peakness == -2, 1, 0) 
+central_df$peak <- is_peak[(1 + period_wdw):(length(is_peak) - period_wdw)]
+```
+
+```{r}
+min_movement_length <- N+5 #We need at least N, because we drop period_wdw on both sides when analysing. This procedure can be relaxed later. We take N+5 for now such that this central part is not just one value which can happen to be weird for whatever reason.
+thresh_zero_freq <- 0.1
+thresh_var_freq <- 0.2
+lcm_tol <- 0.7 #Should this depend on which frequency we detect? Having high values would lead to bigger variance than low values, so this would be harsher on movement where the second frequency is relatively high maybe
+
+thresh_acf <- 0.3 #how high must the lead_freq correlation be for us to recognise it as a periodic movement/steps
+
+step_collections <- list()
+  
+for(j in (1:max(central_df$movement_num))){
+  indices <- which(central_df$movement_num == j)
+  
+  if(length(indices) >= min_movement_length){
+    #Only if we are in a movement with consistent values (not too much change) that is big enough
+    
+    central_part_mvm <- central_df[(min(indices) + period_wdw):(max(indices) - period_wdw),]
+    #We are interested in the middle of this movement. Can be broadened later.
+    main_freq_mvm <- mean(central_part_mvm$main_freq)
+    
+    #Now check if we should also consider a second frequency
+    if(sum(central_part_mvm$second_freq == 0)/length(central_part_mvm$second_freq) >= thresh_zero_freq){
+      second_freq_mvm <- 0 #No second frequency if too many zeroes
+    } else if(var(central_part_mvm$second_freq[central_part_mvm$second_freq != 0]) >= thresh_var_freq) {
+      second_freq_mvm <- 0 #Too much variance, so no consistent second frequency
+      #Maybe we should first get out a small fraction of most extreme values or sth here, so that if almost everywhere second_freq 
+      #is 12, but at a few observations it is suddenly 35, the variance does not blow up
+    } else{
+      second_freq_mvm <- mean(central_part_mvm$second_freq)
+    }
+    
+    #Now we compute the leading frequency. For now limited to at most two main frequencies, but same process should be done for possible third frequency maybe. For now it would be filtered out anyway because it is 0 so often
+    
+    if(second_freq_mvm == 0){
+      lead_freq_mvm <- main_freq_mvm %>% round() #Rounding can be more refined?
+    }
+    else {
+    lead_freq_mvm <- scm(c(main_freq_mvm, second_freq_mvm), tol = lcm_tol) %>% round() #Rounding can be more refined?
+    }
+    
+    steps_in_mvm <- list()
+    step_one <- c() #Initialising as empty so that we can compare with them
+    step_two <- c() #Initialising as empty so that we can compare with them
+    continuation <- FALSE
+    
+    zero_idx <- min(indices) - 1 #We count from this one
+    
+    k <- 1 #k is the index within the current movement we are at
+    while(k <= length(indices)){
+      #print(k)
+      if(central_df$peak[zero_idx + k] == 1) { #Same as [indices][k] in this case
+        #print("peak detected")
+        
+        #We first check if lead_freq (+/- 1 error) from our peak we have a new peak
+        #We have to be careful! For our last few peaks, this might not be within indices
+        
+        if(central_df$peak[zero_idx + k + lead_freq_mvm] == 1){
+          end <- zero_idx + k + lead_freq_mvm
+        } else if(central_df$peak[zero_idx + k + lead_freq_mvm + 1] == 1){
+          #Later choose between first checking +1 and first checking -1
+          end <- zero_idx + k + lead_freq_mvm + 1
+        } else if(central_df$peak[zero_idx + k - lead_freq_mvm - 1] == 1){
+          end <- zero_idx + k + lead_freq_mvm - 1
+        } else {
+          end <- NA
+        }
+        
+        if(!is.na(end)){
+          if(central_df$peak[zero_idx + k - lead_freq_mvm] == 1) {
+            start <- zero_idx + k - lead_freq_mvm
+            } else if(central_df$peak[zero_idx + k - (lead_freq_mvm - 1)] == 1){
+              start <- zero_idx + k - (lead_freq_mvm - 1)
+            } else if(central_df$peak[zero_idx + k - (lead_freq_mvm + 1)] == 1){
+              start <- zero_idx + k - (lead_freq_mvm + 1)
+            } else {
+              start <- NA
+            }
+        }
+        
+        if(!is.na(end) & !is.na(start)){
+          #Check from start to end if correlation at the frequency of that step is very high (alternative: check if very high at the lead frequency of the whole movement, because that sort of should be the case as well, as we assume it is the same movement thus with the same frequencies!?)
+          #If yes, we add these two steps and continue from the end index again
+          
+          lead_freq_part <- (end - start)/2
+          if(lead_freq_part %% 1 != 0){
+            if(lead_freq_mvm > lead_freq_part){
+              lead_freq_part <- ceiling(lead_freq_part)
+            } else{
+              lead_freq_part <- floor(lead_freq_part)
+            }
+          } 
+          
+          #We have start, zero_idx + k and end
+          acf_step <- acf(central_df$data_scaled[start:(end-1)], lag.max = lead_freq_part)
+          
+          if(acf_step[lead_freq_mvm]$acf > thresh_acf) {
+            step_one <- central_df$data_scaled[start:(zero_idx + k - 1)]
+            
+            #We only need to add step_one, if it is not just a continuation from step_two,
+            #so if we did not just add there. I think doing it like this is sufficient
+            if(continuation == FALSE) {
+              steps_in_mvm <- append(steps_in_mvm, list(step_one))
+            }
+            
+            step_two <- central_df$data_scaled[(zero_idx + k):(end - 1)]
+            
+            steps_in_mvm <- append(steps_in_mvm, list(step_two)) 
+            #print(length(steps_in_mvm)) #Bug test
+          
+            
+            continuation <- TRUE #Meaning we have just added steps and continue from the last step
+            
+            
+          } #If not, nothing happens. It is just not periodic enough and we do not recognise them as steps. Having two peaks was by chance
+          else{
+            continuation <- FALSE
+          }
+          
+          #If no, we can also safely skip this part of the movement
+          k <- end - zero_idx #We continue with "end", which is a peak, being our new peak
+          
+          
+        }else{
+          k <- k + 1 #If the current peak was not successful, we keep looking but do not skip a period
+          continuation <- FALSE
+        }
+      } else{
+        k <- k + 1 #If we were not at a peak, we just look at the next one 
+        continuation <- FALSE
+      }
+    }
+    
+    step_collections <- append(step_collections, list(number = j, summary = c(lead_freq_mvm, main_freq_mvm, second_freq_mvm), examples = steps_in_mvm))
+  }
+}
+```
+
+Testing // show in meeting
+- Fix bugs for other periods
+- Fix scaling
+- Make sure it can allow for more than two steps in row. Seems to work in theory, but not picked up as often as you would think?
+- Rounds up the lead_freq from main_freq and second_freq
+
+```{r}
+step_collections[[82]]
+step_collections[[2]]
+plot(step_collections[[3]][[1]], type = "l")
+plot(step_collections[[3]][[2]], type = "l")
+plot(step_collections[[3]][[3]], type = "l")
+plot(step_collections[[3]][[4]], type = "l")
+plot(step_collections[[3]][[5]], type = "l")
+plot(step_collections[[3]][[6]], type = "l")
+plot(step_collections[[3]][[7]], type = "l")
+plot(step_collections[[3]][[8]], type = "l")
+plot(step_collections[[3]][[9]], type = "l")
+plot(step_collections[[3]][[10]], type = "l")
+plot(step_collections[[84]][[11]], type = "l")
+plot(step_collections[[84]][[12]], type = "l")
+plot(step_collections[[84]][[13]], type = "l")
+plot(step_collections[[84]][[14]], type = "l")
+plot(step_collections[[84]][[15]], type = "l")
+plot(step_collections[[84]][[16]], type = "l")
+plot(step_collections[[84]][[17]], type = "l")
+plot(step_collections[[84]][[18]], type = "l")
+plot(step_collections[[84]][[19]], type = "l")
+plot(step_collections[[84]][[20]], type = "l")
+plot(step_collections[[84]][[21]], type = "l")
+plot(step_collections[[84]][[22]], type = "l")
+plot(step_collections[[84]][[23]], type = "l")
+plot(step_collections[[84]][[24]], type = "l")
+plot(step_collections[[84]][[25]], type = "l")
+
+```
+
+--- 
+Below alternative that just establishes the lead frequency, and will deal with those outside of the loop. 
+
+```{r}
+min_movement_length <- N+5 #We need at least N, because we drop period_wdw on both sides when analysing. This procedure can be relaxed later. We take N+5 for now such that this central part is not just one value which can happen to be weird for whatever reason.
+thresh_zero_freq <- 0.1
+thresh_var_freq <- 0.2
+lcm_tol <- 0.7 #Should this depend on which frequency we detect? Having high values would lead to bigger variance than low values, so this would be harsher on movement where the second frequency is relatively high maybe
+
+central_df <- mutate(central_df, lead_freq = 0)
+
+for(j in (1:max(central_df$movement_num))){
+  lead_freq_mvm <- 0 
+  indices <- which(central_df$movement_num == j)
+  
+  if(length(indices) >= min_movement_length){
+    
+    central_part_mvm <- central_df[(min(indices) + period_wdw):(max(indices) - period_wdw),]
+    main_freq_mvm <- mean(central_part_mvm$main_freq)
+    
+    #Now check if we should also consider a second frequency
+    if(sum(central_part_mvm$second_freq == 0)/length(central_part_mvm$second_freq) >= thresh_zero_freq){
+      second_freq_mvm <- 0 #No second frequency if too many zeroes
+    } else if(var(central_part_mvm$second_freq[central_part_mvm$second_freq != 0]) >= thresh_var_freq) {
+      second_freq_mvm <- 0 #Too much variance, so no consistent second frequency
+      #Maybe we should first get out a small fraction of most extreme values or sth here, so that if almost everywhere second_freq 
+      #is 12, but at a few observations it is suddenly 35, the variance does not blow up
+    } else{
+      second_freq_mvm <- mean(central_part_mvm$second_freq)
+    }
+    
+    #Now we compute the leading frequency. For now limited to at most two main frequencies, but same process should be done for possible third frequency maybe. For now it would be filtered out anyway because it is 0 so often
+    
+    if(second_freq_mvm == 0){
+      lead_freq_mvm <- main_freq_mvm %>% round() #Rounding can be more refined?
+    }
+    else {
+    lead_freq_mvm <- scm(c(main_freq_mvm, second_freq_mvm), tol = lcm_tol) %>% round() #Rounding can be more refined?
+    }
+  }
+  central_df$lead_freq[indices] <- lead_freq_mvm #Maybe more needs to be saved than just the lead_freq. After all, we want to make sure we can see the differences between steps in different movements
+}
+```
+

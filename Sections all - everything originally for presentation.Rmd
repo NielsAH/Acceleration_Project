@@ -1,0 +1,1150 @@
+### Importing libraries
+We first import the libraries we need.
+
+```{r, message=F, warning=F}
+#Data analysis
+library(tidyverse)
+library(patchwork)
+library(scales)
+library(RColorBrewer)
+
+#Working with the activity class and data files
+library(lubridate)
+library(read.gt3x)
+library(PhysicalActivity)
+
+#Solving equations
+library(nleqslv)
+library(pracma)
+library(latex2exp)
+```
+
+## Presentation only (for now / changed values slightly)
+
+```{r}
+X <- numeric(100)
+X[1] <- sample(c(-1, 1), size = 1, replace = T)
+for(j in 2:100){
+  X[j] = -1 * X[j-1]
+}
+temp <- data.frame(idx = 1:100, value = X)
+
+# #984EA3
+# #009E73
+# #E69F00 
+
+plot1 <- filter(temp, idx < 11) %>% 
+  ggplot(aes(x = idx)) +
+  geom_line(aes(y = value), color = "#009E73", linewidth = 0.3) +
+  geom_point(aes(y = value), color = "#009E73", size = 2) +
+  labs(
+    x = "Time index",
+    y = "Realisation"
+  ) +
+  scale_x_continuous(breaks = seq(1, 10, by = 1)) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+ggsave("plot1.png", plot1, width = 10, height = 4, dpi = 300)
+```
+
+```{r}
+X <- numeric(100)
+first_two <- sample(list(c(-3/2, 0), c(0, 1), c(1, 0.5), c(0.5, -3/2)), size = 1)
+
+X[1] <- first_two[[1]][1] 
+X[2] <- first_two[[1]][2] 
+
+for(j in 3:100){
+  if(X[j -1] == 1){
+    X[j] = 0.5
+  }
+  else if(X[j - 1] == -3/2){
+    X[j] = 0
+  }
+  else if(X[j - 1] == 0.5){
+    X[j] = -3/2
+  }
+    else if(X[j - 1] == 0){
+    X[j] = 1
+  }
+
+}
+temp <- data.frame(idx = 1:100, value = X)
+
+# #984EA3
+# #009E73
+# #E69F00 
+
+plot2 <- filter(temp, idx < 21) %>% 
+  ggplot(aes(x = idx)) +
+  geom_line(aes(y = value), color = "#009E73", linewidth = 0.3) +
+  geom_point(aes(y = value), color = "#009E73", size = 2) +
+  labs(
+    x = "Time index",
+    y = "Realisation"
+  ) +
+  scale_x_continuous(breaks = seq(1, 20, by = 1)) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+ggsave("plot2.png", plot2, width = 10, height = 4, dpi = 300)
+```
+
+```{r}
+Y <- numeric(100)
+for(j in 1:100){
+  Y[j] <- X[j] + rnorm(1, 0, 0.2)
+}
+
+temp <- data.frame(idx = 0:99, value = Y)
+
+# #984EA3
+# #009E73
+# #E69F00 
+
+plot3 <- filter(temp, idx < 30) %>% 
+  ggplot(aes(x = idx)) +
+  geom_line(aes(y = value), color = "#009E73", linewidth = 0.3) +
+  geom_point(aes(y = value), color = "#009E73", size = 2) +
+  labs(
+    x = "Time index",
+    y = "Realisation"
+  ) +
+  scale_x_continuous(breaks = seq(0, 30, by = 2)) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+ggsave("realisation1.png", plot3, width = 10, height = 4, dpi = 300)
+```
+
+```{r}
+X <- numeric(100)
+X[1] <- sample(c(-3/2, 0, 0.5, 1), size = 1)
+if(runif(1,0,1) <= 0.05){
+  X[j] <- 0
+}
+
+for(j in 2:100){
+  if(runif(1,0,1) > 0.1){
+      if(X[j -1] == 1){
+    X[j] = 0.5
+  }
+  else if(X[j - 1] == -3/2){
+    X[j] = 0
+  }
+  else if(X[j - 1] == 0.5){
+    X[j] = -3/2
+  }
+    else if(X[j - 1] == 0){
+    X[j] = 1
+  }
+  } else{
+    X[j] = 0
+  }
+}
+
+Y <- numeric(100)
+for(j in 1:100){
+  Y[j] <- X[j] + rnorm(1, 0, 0.2)
+}
+
+temp <- data.frame(idx = 0:99, value = Y)
+
+plot4 <- filter(temp, idx < 30) %>% 
+  ggplot(aes(x = idx)) +
+  geom_line(aes(y = value), color = "#009E73", linewidth = 0.3) +
+  geom_point(aes(y = value), color = "#009E73", size = 2) +
+  labs(
+    x = "Time index",
+    y = "Realisation"
+  ) +
+  scale_x_continuous(breaks = seq(0, 30, by = 2)) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+ggsave("realisation2.png", plot4, width = 10, height = 4, dpi = 300)
+```
+
+```{r}
+k <- 10001
+
+X <- numeric(k)
+X[1] <- sample(c(-3/2, 0, 0.5, 1), size = 1)
+
+for(j in 2:k){
+  if(runif(1,0,1) > -1){
+      if(X[j -1] == 1){
+    X[j] = 0.5
+  }
+  else if(X[j - 1] == -3/2){
+    X[j] = 0
+  }
+  else if(X[j - 1] == 0.5){
+    X[j] = -3/2
+  }
+    else if(X[j - 1] == 0){
+    X[j] = 1
+  }
+  }
+}
+
+Y <- numeric(k)
+for(j in 1:k){
+  Y[j] <- X[j] + rnorm(1, 0, 0.2)
+}
+
+#Y <- Y - mean(Y)
+
+spec <- energy_kernel(Y, 1, ma_trunc) 
+
+spec_df <- data.frame(comp = 1:((k-1)/2), val = spec)
+peak <- spec_df[which.max(spec_df$val), ]
+
+plot <- ggplot(spec_df, aes(x = comp, xend = comp, y = 0, yend = val)) + geom_segment(linewidth = 1, colour = "#D62728") +
+  geom_text(
+    data = peak,
+    aes(
+      x = comp + k/40,  # slight shift to the right
+      y = val - 0.1005,
+      label = paste0("Period: ", round(k/comp, 3), "\nFraction: ", round(val, 4))
+    ),
+    hjust = 0,
+    vjust = 0.5,
+    size = 5,
+    color = "black"
+  ) +
+  labs(
+    x = "Fourier component",
+    y = TeX(r'( Fraction of (mean $0$) variance explained )')
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),     
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+ggsave("wide1trunc1.png", plot, width = 10, height = 4, dpi = 300)
+
+spec_df <- spec_df %>%
+  mutate(
+    is_overflow = val > 0.1,
+    yend_plot = ifelse(is_overflow, val, pmin(val, 0.1)),
+    line_type = ifelse(is_overflow, "dashed", "solid")
+  )
+
+plot_zoom <- ggplot(spec_df, aes(x = comp)) +
+  geom_segment(aes(xend = comp, y = 0, yend = yend_plot, linetype = line_type),
+               linewidth = 1, colour = "#D62728") +
+  scale_linetype_identity() +  # Use the linetype values directly
+  coord_cartesian(ylim = c(0, 0.1)) +  # Limit axis but allow drawing outside
+  xlim(2450, 2550) +
+  # geom_text(
+  #   data = peak,
+  #   aes(
+  #     x = comp + k/40,  # slight shift to the right
+  #     y = val - 0.1005,
+  #     label = paste0("Period: ", round(k/comp, 3), "\nFraction: ", round(val, 4))
+  #   ),
+  #   hjust = 0,
+  #   vjust = 0.5,
+  #   size = 5,
+  #   color = "black"
+  # ) +
+  labs(
+    x = "Fourier component",
+    y = TeX(r'( Fraction of (mean $0$) variance explained )')
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),     
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+ggsave("wide1trunc1zoom.png", plot_zoom, width = 10, height = 4, dpi = 300)
+```
+
+
+```{r}
+k <- 10001
+
+X <- numeric(k)
+X[1] <- sample(c(-3/2, 0, 0.5, 1), size = 1)
+if(runif(1,0,1) <= 0.05){
+  X[1] <- 0
+}
+
+for(j in 2:k){
+  if(runif(1,0,1) > 0.1){
+      if(X[j -1] == 1){
+    X[j] = 0.5
+  }
+  else if(X[j - 1] == -3/2){
+    X[j] = 0
+  }
+  else if(X[j - 1] == 0.5){
+    X[j] = -3/2
+  }
+    else if(X[j - 1] == 0){
+    X[j] = 1
+  }
+  } else{
+    X[j] = 0
+  }
+}
+
+Y <- numeric(k)
+for(j in 1:k){
+  Y[j] <- X[j] + rnorm(1, 0, 0.2)
+}
+
+spec <- energy_kernel(Y, 1, ma_trunc) 
+
+spec_df <- data.frame(comp = 1:((k-1)/2), val = spec)
+peak <- spec_df[which.max(spec_df$val), ]
+
+plot <- ggplot(spec_df, aes(x = comp, xend = comp, y = 0, yend = val)) + geom_segment(linewidth = 1, colour = "#D62728") +
+  geom_text(
+    data = peak,
+    aes(
+      x = comp + k/40,  # slight shift to the right
+      y = val - 0.001,
+      label = paste0("Period: ", round(k/comp, 3), "\nFraction: ", round(val, 4))
+    ),
+    hjust = 0,
+    vjust = 0.5,
+    size = 5,
+    color = "black"
+  ) +
+  labs(
+    x = "Fourier component",
+    y = TeX(r'( Fraction of (mean $0$) variance explained )')
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),     
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+ggsave("10000trunc1.png", plot, width = 10, height = 4, dpi = 300)
+```
+
+```{r}
+library(rgl)
+open3d()
+
+# Axes
+segments3d(rbind(c(0,0,0), c(1,0,0)), col = "black")
+text3d(1.1, 0, 0, "X", col = "black")
+
+segments3d(rbind(c(0,0,0), c(0,1,0)), col = "black")
+text3d(0, 1.1, 0, "Y", col = "black")
+
+segments3d(rbind(c(0,0,0), c(0,0,1)), col = "black")
+text3d(0, 0, 1.1, "Z", col = "black")
+
+# Rotated Z axis
+theta <- 15 * pi / 180
+Zx <- sin(theta)
+Zz <- cos(theta)
+segments3d(rbind(c(0,0,0), c(Zx, 0, Zz)), col = "blue", lwd = 2)
+text3d(1.1 * Zx, 0, 1.1 * Zz, "vertical", col = "blue")
+
+# Arc
+arc_angle <- seq(0, theta, length.out = 30)
+arc_radius <- 0.5
+arc_x <- arc_radius * sin(arc_angle)
+arc_y <- rep(0, length(arc_angle))
+arc_z <- arc_radius * cos(arc_angle)
+lines3d(arc_x, arc_y, arc_z, col = "red", lwd = 2)
+
+# Arrowhead
+arrow_tip <- c(arc_x[length(arc_x)], arc_y[length(arc_y)], arc_z[length(arc_z)])
+arrow_dir <- -c(cos(theta), 0, -sin(theta))  # Flip to correct side
+arrow_length <- 0.05
+
+rot_y <- function(angle) {
+  matrix(c(cos(angle), 0, sin(angle),
+           0, 1, 0,
+          -sin(angle), 0, cos(angle)), nrow = 3, byrow = TRUE)
+}
+
+angle1 <- 30 * pi / 180
+angle2 <- -30 * pi / 180
+
+vec1 <- as.numeric(arrow_tip + arrow_length * (rot_y(angle1) %*% arrow_dir))
+vec2 <- as.numeric(arrow_tip + arrow_length * (rot_y(angle2) %*% arrow_dir))
+
+segments3d(rbind(arrow_tip, vec1), col = "red", lwd = 2)
+segments3d(rbind(arrow_tip, vec2), col = "red", lwd = 2)
+
+
+```
+
+
+
+## Clusterings for presentation
+
+```{r}
+D <- short_distance_data_walk1_sgn[[1]]
+density <- 21
+points <- 10
+
+D <- short_distance_data_walk1_redi[[1]]
+  density <- 57
+  points <- 10
+```
+
+```{r}
+clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+
+
+mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+
+coords <- as.data.frame(mds_result$points)
+
+colnames(coords) <- c("X", "Y", "Z")
+  
+coords$cluster <- clustering
+coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+
+plot <- plot_ly(coords, x = ~X, y = ~Y, z = ~Z,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(size = 4)) %>%
+         layout(title = "First walking test - absolute distance dissimilarities",
+                legend = list(title = list(text = "Group")))
+
+
+plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(size = 4)) %>%
+         layout(title = "Title",
+                legend = list(title = list(text = "Group")))
+
+saveWidget(plot, "presentation_walk1sgn.html", selfcontained = T)
+```
+
+```{r}
+library(mvtnorm)
+n <- 1000
+mu <- c(0, 0)
+Sigma <- matrix(c(1, 0, 0, 1), nrow=2)
+
+# Sample points
+points <- rmvnorm(n, mean = mu, sigma = Sigma)
+
+# Calculate distances from mean
+dists <- sqrt(rowSums((points - matrix(mu, n, 2, byrow=TRUE))^2))
+
+# k%
+k <- 10
+threshold <- quantile(dists, probs = 1 - k/100)
+
+# Data frame for ggplot
+df <- data.frame(x = points[,1], y = points[,2], 
+                 far = dists > threshold)
+
+# Plot
+ggplot(df, aes(x, y, color = far)) +
+  geom_point(alpha=0.6) +
+  scale_color_manual(values = c("FALSE" = "#984EA3", "TRUE" = "#E69F00"),
+                     labels = c("FALSE" = "Movement 1", "TRUE" = "Movement 1 \n far from centre"),
+                     name = "Movement type") +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  ) +
+  theme(
+    axis.text = element_blank()
+  ) +
+  labs(
+       x = NULL, y = NULL)   
+  )
+```
+
+```{r}
+mu1 <- c(2, 2)
+Sigma1 <- matrix(c(1, 0, 0, 1), 2)
+
+mu2 <- c(4, 4)
+Sigma2 <- matrix(c(0.5, 0, 0, 0.5), 2)
+
+n <- 700
+m <- 300
+pts1 <- rmvnorm(n, mu1, Sigma1)
+pts2 <- rmvnorm(m, mu2, Sigma2)
+
+# Far points (arbitrary)
+far_pts <- matrix(c(-0.3, 8.1,
+                    7, 2,
+                    7.3, 2.4,
+                    9.2, 7.1,
+                    8.4, 9.3,
+                    4.1, 9,
+                    7.4, 7.3), ncol=2, byrow=TRUE)
+
+# Combine into data frame with labels
+df1 <- data.frame(x = pts1[,1], y = pts1[,2], group = "Gaussian 1")
+df2 <- data.frame(x = pts2[,1], y = pts2[,2], group = "Gaussian 2")
+df3 <- data.frame(x = far_pts[,1], y = far_pts[,2], group = "Far points")
+
+df_all <- rbind(df1, df2, df3)
+
+# Plot
+ggplot(df_all, aes(x, y, color = group)) +
+  geom_point(alpha=0.7, size=2) +
+  scale_color_manual(values = c("Gaussian 1" = "#009E73", "Gaussian 2" = "#984EA3", "Far points" = "#E69F00"),
+                     labels = c("Gaussian 1" = "Movement 1", "Gaussian 2" = "Movement 2", "Far points" = "Noise"),
+                     name = "Underlying movement") +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  ) +
+  theme(
+    axis.text = element_blank()
+  ) +
+  labs(
+       x = NULL, y = NULL)
+```
+
+## Similarities
+
+```{r}
+step1 <- c(-0.5, 0.5, 4, 2.5,0.5, -4.5, -3.5, 1.5, 3.5, 2.5, 0.5, -3.5, -2)
+step2 <- c( -4.5, -5.5, -4.5, 0.5, 2.5, 3.5, 4.5, 2.5, -0.5, -1.5, -3.5, -3.5, -2.5, -0.5, 0.5, 1.5, 2.5, 5.5, 6.6, 2.5, 1.5, 0.5, -1.5, -3.5)
+
+step1plot <- data.frame(value = step1, idx = 1:length(step1)) %>% 
+  ggplot(aes(x = idx)) +
+  geom_line(aes(y = value), color = "#984EA3", linewidth = 1) +
+  geom_point(aes(y = value), color = "#984EA3", size = 3) +
+  labs(
+    x = "Index",
+    y = "Acceleration in g"
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+step2plot <- data.frame(value = step2, idx = 1:length(step2)) %>% 
+  ggplot(aes(x = idx)) +
+  geom_line(aes(y = value), color = "#E69F00", linewidth = 1) +
+  geom_point(aes(y = value), color = "#E69F00", size = 3) +
+  labs(
+    x = "Index",
+    y = "Acceleration in g"
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+ggsave("step1.png", step1plot, width = 10, height = 4, dpi = 300)
+ggsave("step2.png", step2plot, width = 10, height = 4, dpi = 300)
+```
+
+```{r}
+step1 <- rescale_improved(step1, 100)
+step2 <- rescale_improved(step2, 100)
+
+step1plot <- data.frame(value = step1, idx = 1:length(step1)) %>% 
+  ggplot(aes(x = idx)) +
+  geom_line(aes(y = value), color = "#984EA3", linewidth = 1) +
+  geom_point(aes(y = value), color = "#984EA3", size = 3) +
+  labs(
+    x = "Index",
+    y = "Acceleration in g"
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+step2plot <- data.frame(value = step2, idx = 1:length(step2)) %>% 
+  ggplot(aes(x = idx)) +
+  geom_line(aes(y = value), color = "#E69F00", linewidth = 1) +
+  geom_point(aes(y = value), color = "#E69F00", size = 3) +
+  labs(
+    x = "Index",
+    y = "Acceleration in g"
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+ggsave("step1new.png", step1plot, width = 10, height = 4, dpi = 300)
+ggsave("step2new.png", step2plot, width = 10, height = 4, dpi = 300)
+```
+
+```{r}
+a <- step1
+b <- step2
+
+df <- data.frame(
+  index = 1:length(a),
+  a = a,
+  b = b,
+  same_sign = sign(a) == sign(b)
+)
+
+
+segments <- data.frame(
+  x = df$index,
+  xend = df$index,
+  y = df$a,
+  yend = df$b,
+  same_sign = df$same_sign
+)
+
+
+stepcomp <- ggplot() +
+  geom_line(data = df, aes(x = index, y = a), color = "#984EA3", linewidth = 2) +
+  geom_line(data = df, aes(x = index, y = b), color = "#E69F00", linewidth = 2) +
+  geom_segment(data = segments, aes(x = x, xend = xend, y = y, yend = yend, color = same_sign), size = 1, alpha = 0.5) +
+  scale_color_manual(
+    name = "Entry comparison",
+    values = c("TRUE" = "green", "FALSE" = "red"),
+    labels = c("TRUE" = "Sign matches", "FALSE" = "Sign differs")
+  ) +
+  labs(x = "Index", 
+       y = "Acceleration in g") +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+ggsave("stepcomparison.png", stepcomp, width = 10, height = 4, dpi = 300)
+
+```
+
+```{r}
+track <- numeric(100)
+track[1] <- sum(sign(step1) != sign(step2))
+for(j in 2:100){
+  new_step1 <- c(step1[j:100], step1[1:(j-1)]) 
+  track[j] <- sum(sign(new_step1) != sign(step2))
+}
+i <- which.min(track)
+new_step1 <- c(step1[i:100], step1[1:(i-1)]) 
+
+a <- new_step1
+b <- step2
+
+df <- data.frame(
+  index = 1:length(a),
+  a = a,
+  b = b,
+  same_sign = sign(a) == sign(b)
+)
+
+
+segments <- data.frame(
+  x = df$index,
+  xend = df$index,
+  y = df$a,
+  yend = df$b,
+  same_sign = df$same_sign
+)
+
+
+stepcomp <- ggplot() +
+  geom_line(data = df, aes(x = index, y = a), color = "#984EA3", linewidth = 2) +
+  geom_line(data = df, aes(x = index, y = b), color = "#E69F00", linewidth = 2) +
+  geom_segment(data = segments, aes(x = x, xend = xend, y = y, yend = yend, color = same_sign), size = 1, alpha = 0.5) +
+  scale_color_manual(
+    name = "Entry comparison",
+    values = c("TRUE" = "green", "FALSE" = "red"),
+    labels = c("TRUE" = "Sign matches", "FALSE" = "Sign differs")
+  ) +
+  labs(x = "Index", 
+       y = "Acceleration in g") +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+ggsave("stepcomparison_shift.png", stepcomp, width = 10, height = 4, dpi = 300)
+```
+
+
+```{r}
+test1 <- c(-1, 1,3,5,3,1,-1,-1,-1,-1,-1,-1,1,3,5,3,1,-1,-1,-1, -1, -1, -1)/18
+test2 <- c(-1, 1,3,5,3,1,-1, 1,3,5,3,1,-1,-1,-1, -1, -1,-1,-1,-1, -1, -1, -1)/18
+test3 <- c(-1, 1,3,5,3,1,-1,-1, -1,-1,-1,-1, -1,-1,-1, -1, -1, 1,3,5,3,1, -1)/18
+test4 <- c(-1, 1,3,5,3,1,-1,-1,-1, -1,-1,-1,-1,-1,-1,-1,-1, -1,-1, -1, -1,-1, -1)/18
+
+df <- data.frame(test1 = test1, test2 = test2, test3 = test3 , test4 = test4, idx = 1:23)
+
+
+
+test1plot <- df %>% 
+  ggplot(aes(x = idx)) +
+  geom_line(aes(y = test1), color = "#984EA3", linewidth = 1) +
+  geom_point(aes(y = test1), color = "#984EA3", size = 3) +
+  labs(
+    x = "Index",
+    y = "Acceleration in g"
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+test2plot <- df %>% 
+  ggplot(aes(x = idx)) +
+  geom_line(aes(y = test2), color = "#984EA3", linewidth = 1) +
+  geom_point(aes(y = test2), color = "#984EA3", size = 3) +
+  labs(
+    x = "Index",
+    y = "Acceleration in g"
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+test3plot <- df %>% 
+  ggplot(aes(x = idx)) +
+  geom_line(aes(y = test3), color = "#984EA3", linewidth = 1) +
+  geom_point(aes(y = test3), color = "#984EA3", size = 3) +
+  labs(
+    x = "Index",
+    y = "Acceleration in g"
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+test4plot <- df %>% 
+  ggplot(aes(x = idx)) +
+  geom_line(aes(y = test4), color = "#E69F00", linewidth = 1) +
+  geom_point(aes(y = test4), color = "#E69F00", size = 3) +
+  labs(
+    x = "Index",
+    y = "Acceleration in g"
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+ggsave("test1.png", test1plot, width = 10, height = 4, dpi = 300)
+ggsave("test2.png", test2plot, width = 10, height = 4, dpi = 300)
+ggsave("test3.png", test3plot, width = 10, height = 4, dpi = 300)
+ggsave("test4.png", test4plot, width = 10, height = 4, dpi = 300)
+```
+
+```{r}
+triangle <- data.frame(
+  x = c(0, 1, 0.5),
+  y = c(0, 0, sqrt(3)/2),
+  label = "triangle"
+)
+
+center <- data.frame(
+  x = mean(triangle$x),
+  y = mean(triangle$y),
+  label = "center"
+)
+
+yvals <- c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8)
+xvals <- 0.5 + sqrt(0.333 - (yvals - 0.2886)^2)
+xvals2 <- 1 - xvals
+
+misc <- data.frame(x = c(xvals, xvals2),
+                   y = c(yvals),
+                   label = "triangle")
+
+points_df <- rbind(triangle, center, misc)
+
+triangle_segments <- data.frame(
+  x = c(triangle$x),
+  y = c(triangle$y),
+  xend = c(triangle$x[2:3], triangle$x[1]),
+  yend = c(triangle$y[2:3], triangle$y[1]),
+  value = 2
+)
+
+center_segments <- data.frame(
+  x = c(triangle$x, misc$x),
+  y = c(triangle$y, misc$y),
+  xend = center$x[1],
+  yend = center$y[1],
+  value = 1
+)
+
+segments_df <- rbind(triangle_segments, center_segments)
+
+segments_df$label_x <- (segments_df$x + segments_df$xend) / 2
+segments_df$label_y <- (segments_df$y + segments_df$yend) / 2
+
+ggplot() +
+  geom_segment(data = segments_df,
+               aes(x = x, y = y, xend = xend, yend = yend),
+               color = "#009E73") +
+#  geom_text(data = segments_df,
+ #           aes(x = label_x, y = label_y, label = value),
+ #           color = "black", size = 6) +
+  geom_point(data = subset(points_df, label == "triangle"),
+             aes(x = x, y = y), color = "#984EA3", size = 4) +
+  geom_point(data = subset(points_df, label == "center"),
+             aes(x = x, y = y), color = "#E69F00", size = 4) +
+  coord_fixed() +
+ theme_minimal() +
+  theme(
+    axis.text = element_blank()
+  ) +
+  labs(
+       x = NULL, y = NULL) +
+  theme(legend.position = "none")
+```
+
+## Walking quality plot
+
+```{r}
+#Particpant 10 is W10: data not available up until 2024
+
+data.frame(names = 1:9,
+           identifier = c(30, 39, 33, 34, 41, 40, 42, 36, 6),
+           level = c(1, 1, 2, 1, 2, 1, 1, 1, 1), #GMFCS
+           concentration_walking = c(1, 0, 0, 0, 1, 0, 1, 1, 0), #Normal concentration or not
+           deviant = c(1, 1, 1, 1, 1, 0, 1, 1, 0), #Is walking normal for visual impairement
+           avg_rank = c(9.222, 2.444, 7.444, 4.222, 1.111, 4.111, 9, 5.333, 7.556)) #Based on the 10 point density approach/table
+
+# spread <- list(c(1,1,1,1,1,1,1,2),
+#                c(2, 4, 6, 7, 3, 1, 6, 6),
+#                c(3, 4, 3, 2, 2, 2, 2, 2),
+#                c(4, 5, 4, 3, 2, 7, 4, 3),
+#                c(6, 6, 5, 4, 5, 6, 5, 5),
+#                c(10, 10, 10, 9, 9, 9, 9, 9),
+#                c(4, 9, 9, 9, 10, 10, 10, 10),
+#                c(7, 7, 7, 7, 7, 8, 8, 10),
+#                c(8, 8, 8, 8, 8, 7, 6, 5)
+#                )
+
+spread <- list(c(10, 10, 10, 9, 9, 9, 9, 9, 8),
+               c(3, 4, 3, 2, 2, 2, 2, 2, 2),
+               c(8, 8, 8, 8, 8, 7, 6, 5, 9),
+               c(2, 4, 6, 7, 3, 1, 6, 6, 3),
+               c(1, 1, 1, 1, 1, 1, 1, 2, 1),
+               c(4, 5, 4, 3, 2, 7, 4, 3, 5),
+               c(4, 9, 9, 9, 10, 10, 10, 10, 10),
+               c(6, 6, 5, 4, 5, 6, 5, 5, 6),
+               c(7, 7, 7, 7, 7, 8, 8, 10, 7)
+               )
+
+
+names <- c("W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9")
+level <- c(1, 1, 2, 1, 2, 1, 1, 1, 1)
+concentration <- c(0, 1, 0, 0, 1, 0, 1, 1, 0) #Check
+deviance <- c(1, 1, 1, 1, 1, 0, 1, 1, 0)
+
+#Based is probably to show boxplots for each one, and then depending on level, concentration loss and deviance from normal walking behaviour colour certain plots
+plot_df <- map2_df(spread, names, ~tibble(
+  name = .y,
+  level = level[which(names == .y)],
+  concentration = concentration[which(names == .y)],
+  deviance = deviance[which(names == .y)],
+  value = .x
+))
+
+plot_df$level <- factor(plot_df$level, labels = c("Type 1", "Type 2"))
+plot_df$concentration <- factor(plot_df$concentration, labels = c("Type 1", "Type 2"))
+plot_df$deviance <- factor(plot_df$deviance, labels = c("Type 1", "Type 2"))
+
+plot1 <- ggplot(plot_df, aes(x = factor(name), y = value, fill = level)) +
+  geom_boxplot() +
+  stat_summary(fun = mean, geom = "point", size = 3, aes(color = level), shape = 16) +
+  scale_fill_manual(values = c("Type 1" = "#56B4E9", "Type 2" = "#D62728"),
+                    labels = c("Type 1" = "Level 1", "Type 2" = "Level 2")) +
+  scale_color_manual(values = c("Type 1" = "blue", "Type 2" = "orange"),
+                    labels = c("Type 1" = "Level 1", "Type 2" = "Level 2")) +
+    scale_y_continuous(breaks = 1:10) +
+  labs(x = "Individual", y = "Rank", fill = "GMFCS Level", color = "GMFCS Level") +
+  theme_minimal()
+
+plot2 <- ggplot(plot_df, aes(x = factor(name), y = value, fill = concentration)) +
+  geom_boxplot() +
+  stat_summary(fun = mean, geom = "point", size = 3, aes(color = concentration), shape = 16) +
+  scale_fill_manual(values = c("Type 1" = "#56B4E9", "Type 2" = "#D62728"),
+                    labels = c("Type 1" = "Good", "Type 2" = "Poor"),
+                    name = "Concentration \n during tasks") +
+  scale_color_manual(values = c("Type 1" = "blue", "Type 2" = "orange"),
+                    labels = c("Type 1" = "Good", "Type 2" = "Poor"),
+                    name = "Concentration \n during tasks") +
+    scale_y_continuous(breaks = 1:10) +
+  labs(x = "Individual", y = "Rank", fill = "GMFCS Level", color = "GMFCS Level") +
+  theme_minimal()
+
+plot3 <- ggplot(plot_df, aes(x = factor(name), y = value, fill = deviance)) +
+  geom_boxplot() +
+  stat_summary(fun = mean, geom = "point", size = 3, aes(color = deviance), shape = 16) +
+  scale_fill_manual(values = c("Type 1" = "#56B4E9", "Type 2" = "#D62728"),
+                    labels = c("Type 1" = "Normal for \n visual \n impairment", "Type 2" = "Deviant"),
+                    name = "Impression \n expert") +
+  scale_color_manual(values = c("Type 1" = "blue", "Type 2" = "orange"),
+                    labels = c("Type 1" = "Normal for \n visual \n impairment", "Type 2" = "Deviant"),
+                    name = "Impression \n expert") +
+  scale_y_continuous(breaks = 1:10) +
+  labs(x = "Individual", y = "Rank", fill = "GMFCS Level", color = "GMFCS Level") +
+  theme_minimal()
+
+ggsave("level.png", plot1, width = 8, height = 4, dpi = 300)
+
+ggsave("concentration.png", plot2, width = 8, height = 4, dpi = 300)
+
+ggsave("deviant.png", plot3, width = 8, height = 4, dpi = 300)
+
+```
+
+```{r}
+library(mclust)
+
+set.seed(123)
+data <- c(rnorm(530, 10.6, 0.35), rnorm(270, 9.65, 0.36),
+          rnorm(80, 11.82, 0.31), rnorm(120, 8.61, 0.52))
+
+gmm <- Mclust(data, G = 4)
+
+means <- gmm$parameters$mean
+sds <- sqrt(gmm$parameters$variance$sigmasq)
+weights <- gmm$parameters$pro
+
+x_vals <- seq(min(data), max(data), length.out = 1000)
+
+p <- ggplot(data.frame(x = data), aes(x)) +
+  geom_density(aes(y = ..density..), color = "black", linetype = "dashed", size = 1)
+
+for (k in 1:4) {
+  comp_df <- data.frame(
+    x = x_vals,
+    y = weights[k] * dnorm(x_vals, means[k], sds[k])
+  )
+  p <- p + geom_area(data = comp_df, aes(x = x, y = y),
+                     fill = scales::hue_pal()(4)[k], alpha = 0.4)
+}
+
+p + theme_void()
+```
+
+## Thicker lines
+
+```{r}
+start_time <- as.POSIXct("2025-01-20 14:18:24.000")
+end_time <- as.POSIXct("2025-01-20 14:18:32.330")
+df <- Walk2
+start_time <- as.POSIXct("2024-10-10 08:00:21.000")
+end_time <- as.POSIXct("2024-10-10 08:00:29.330")
+df <- A20_off
+start_time <- as.POSIXct("2022-11-05 12:54:14.000")
+end_time <- as.POSIXct("2022-11-05 12:54:22.330")
+df <- S1_off
+start_time <- as.POSIXct("2024-01-10 11:54:30.000")
+end_time <- as.POSIXct("2024-01-10 11:54:38.330")
+df <- H11_off
+
+
+plot <- filter(df, time >= start_time & time < end_time) %>% 
+  ggplot(aes(x = 1:250)) +
+  geom_line(aes(y = X*9.80665, color = "Direction 1"), linewidth = 1) +
+  geom_line(aes(y = Y*9.80665, color = "Direction 2"), linewidth = 1) +
+  geom_line(aes(y = Z*9.80665, color = "Direction 3"), linewidth = 1) +
+  scale_color_manual(
+    name = "",
+    values = c("Direction 1" = "#56B4E9", "Direction 2" = "#D62728", "Direction 3" = "#FFCC33")
+  ) +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )')
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+ggsave("h11.png", plot, width = 10, height = 4, dpi = 300)
+
+```
+
+```{r}
+
+start_time <- as.POSIXct("2024-10-10 14:29:00.000")
+end_time <- as.POSIXct("2024-10-10 14:29:08.330")
+temp <- as.data.frame(filter(A20_off, time >= start_time & time < end_time))
+
+temp$colour <- c(rep(0, 44), rep(1,33), rep(2, 35), rep(3, 35), rep(4, 35), rep(5, 35), rep(6, 33))
+temp$Y[1:40] <- sin(temp$Y[1:40])/10 - 1
+
+temp$group <- factor(
+  dplyr::case_when(
+    temp$colour == 0 ~ "Inactive",
+    temp$colour %% 2 == 1 ~ "Odd steps",
+    TRUE ~ "Even steps"
+  ),
+  levels = c("Inactive", "Odd steps", "Even steps")
+)
+
+plot <- temp %>% 
+  ggplot(aes(x = 1:250)) +
+  geom_point(aes(y = Y * 9.80665, color = group), size = 2) +
+  geom_line(aes(y = Y * 9.80665), color = "black", linewidth = 0.5) +
+  scale_color_manual(
+    values = c(
+      "Inactive" = "#984EA3",
+      "Odd steps" = "#009E73",
+      "Even steps" = "#E69F00"
+    ),
+    name = "Step Type",
+    labels = c("Inactive", "Odd pairs", "Even pairs")
+  ) +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )')
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+ggsave("extraction_result.png", plot, width = 10, height = 4, dpi = 300)
+
+
+```
+
+```{r}
+start_time <- as.POSIXct("2024-10-10 14:29:00.000")
+end_time <- as.POSIXct("2024-10-10 14:29:08.330")
+plot <- filter(A20_off, time >= start_time & time < end_time) %>% 
+  ggplot(aes(x = 1:250)) +
+  geom_point(aes(y = X*9.80665, color = "Direction 1"), size = 2) +
+  geom_point(aes(y = Y*9.80665, color = "Direction 2"), size = 2) +
+  geom_point(aes(y = Z*9.80665, color = "Direction 3"), size = 2) +
+  scale_color_manual(
+    name = "",
+    values = c("Direction 1" = "#56B4E9", "Direction 2" = "#D62728", "Direction 3" = "#FFCC33")
+  ) +
+  labs(
+    x = "Index",
+    y = expression("Acceleration in" ~ m/s^2)
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+```

@@ -1,0 +1,2486 @@
+```{r, message=F, warning=F}
+#Data analysis
+library(tidyverse)
+library(latex2exp)
+library(patchwork)
+library(scales)
+library(RColorBrewer)
+
+#Working with the activity class and data files
+library(lubridate)
+library(read.gt3x)
+library(PhysicalActivity)
+
+#Solving equations
+library(nleqslv)
+library(pracma)
+library(latex2exp)
+
+#Reshaping / data manipulation
+library(reshape2)
+library(data.table)
+library(zeallot)
+
+##gganimate/creating animations
+library(gganimate)
+library(glue)
+library(shiny)
+library(av)
+library(magick)
+
+#Clustering
+library(dbscan)
+library(cluster)
+library(plotly)
+library(htmlwidgets)
+library(htmltools)
+library(smacof)
+```
+
+# Examples all with spasm data, later generalise for more data after getting approach
+
+## General: data
+
+```{r}
+#Purely analysis of what is on video (5 seconds on both sides added):
+start_time <- as.POSIXct("2025-04-15 11:34:52.099999")
+end_time <- as.POSIXct("2025-04-15 11:35:51.099999")
+df_spas_vid <- filter(Misc3, time > start_time & time < end_time)
+
+start_time <- as.POSIXct("2025-01-20 10:31:25.000")
+end_time <- as.POSIXct("2025-01-20 10:37:40.000")
+df_walk1 <- filter(Walk1, time > start_time & time < end_time)
+
+start_time <- as.POSIXct("2025-01-20 10:50:06.000")
+end_time <- as.POSIXct("2025-01-20 10:56:16.000")
+df_walk2 <- filter(Walk1, time > start_time & time < end_time)
+
+start_time <- as.POSIXct("2025-01-20 11:38:10.000")
+end_time <- as.POSIXct("2025-01-20 11:44:20.000")
+df_walk3 <- filter(Walk1, time > start_time & time < end_time)
+
+start_time <- as.POSIXct("2025-01-20 14:18:20.000")
+end_time <- as.POSIXct("2025-01-20 14:24:30.000")
+df_walk4 <- filter(Walk2, time > start_time & time < end_time)
+
+start_time <- as.POSIXct("2025-01-20 15:00:30.000")
+end_time <- as.POSIXct("2025-01-20 15:06:50.000")
+df_walk5 <- filter(Walk2, time > start_time & time < end_time)
+
+start_time <- as.POSIXct("2025-01-20 15:38:02.000")
+end_time <- as.POSIXct("2025-01-20 15:44:15.000")
+df_walk6 <- filter(Walk2, time > start_time & time < end_time)
+
+start_time <- as.POSIXct("2025-02-17 10:43:00.000")
+end_time <- as.POSIXct("2025-02-17 10:49:10.000")
+df_walk7 <- filter(Walk3, time > start_time & time < end_time)
+
+start_time <- as.POSIXct("2025-02-17 11:16:00.000")
+end_time <- as.POSIXct("2025-02-17 11:22:20.000")
+df_walk8 <- filter(Walk3, time > start_time & time < end_time)
+
+start_time <- as.POSIXct("2025-02-17 11:47:40.000")
+end_time <- as.POSIXct("2025-02-17 11:54:00.000")
+df_walk9 <- filter(Walk3, time > start_time & time < end_time)
+
+start_time <- as.POSIXct("2025-02-17 13:35:50.000")
+end_time <- as.POSIXct("2025-02-17 13:42:05.000")
+df_walk10 <- filter(Walk3, time > start_time & time < end_time)
+
+wdw_size <- 120
+ma_data <- 5 
+ma_energy <- 5 
+kernel_func <- ma_gauss 
+std_dev <- 1
+upright_thresh <- 0.75
+abs_acc_thresh <- 0.1 
+thresh_abs <- 0 
+thresh_rel <- 0.25 
+min_step_period <- 5
+max_step_period <- 40
+period_len <- 5 
+period_len_double <- 5
+period_thresh <- 0.14
+double_step_thresh <- 0.21
+thresh_direction <- 0.3
+
+# data_0 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, 0, 0, 0, min_step_period, max_step_period, 7, 7, 0, 0, thresh_direction, sigma = std_dev) #Quite a bit of false negatives
+# data_1 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, 0.1, 0, 0.2, min_step_period, max_step_period, 6, 6, 0.05, 0.1, thresh_direction, sigma = std_dev) 
+# data_2 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, 0.1, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+data_walk1 <- fast_extraction_algorithm(df_walk1, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+# data_4 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, 0.3, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+# data_5 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, 0.4, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+# data_6 <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, 0.5, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+
+#seq_list, time_thresh, freq_diff_thresh, min_total, wdw_size, min_highest, allow_small, hill_dominating_thresh, no_ma_fourier, kernel_fourier, ...
+# ordata_0 <- Glue_and_classify(data_0, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+# ordata_1 <- Glue_and_classify(data_1, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+# ordata_2 <- Glue_and_classify(data_2, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+# ordata_3 <- Glue_and_classify(data_walk1, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+# ordata_4 <- Glue_and_classify(data_4, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+# ordata_5 <- Glue_and_classify(data_5, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+# ordata_6 <- Glue_and_classify(data_6, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+
+data_walk2 <- fast_extraction_algorithm(df_walk2, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+data_walk3 <- fast_extraction_algorithm(df_walk3, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+data_walk4 <- fast_extraction_algorithm(df_walk4, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+data_walk5 <- fast_extraction_algorithm(df_walk5, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+data_walk6 <- fast_extraction_algorithm(df_walk6, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+data_walk7 <- fast_extraction_algorithm(df_walk7, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+data_walk8 <- fast_extraction_algorithm(df_walk8, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+data_walk9 <- fast_extraction_algorithm(df_walk9, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+data_walk10 <- fast_extraction_algorithm(df_walk10, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+
+#4 variants for those with little data as well
+# data_walk2_low <- fast_extraction_algorithm(df_walk2, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, 0, thresh_abs, 0, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+data_walk3_low <- fast_extraction_algorithm(df_walk3, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, 0, thresh_abs, 0, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+data_walk4_low <- fast_extraction_algorithm(df_walk4, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, 0, thresh_abs, 0, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+data_walk5_low <- fast_extraction_algorithm(df_walk5, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, 0, thresh_abs, 0, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+
+# #We also add a few hundred steps for the healthy children
+# start_time <- as.POSIXct("2024-01-06 07:00:00.000")
+# end_time <- as.POSIXct("2024-01-06 09:00:00.000")
+# df_H10 <- filter(H10_off, time > start_time & time < end_time)
+# data_H10 <- fast_extraction_algorithm(df_H10, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+# 
+# start_time <- as.POSIXct("2024-01-06 09:40:00.000") #Opted for slightly later because then more activity and less time needed to wait
+# end_time <- as.POSIXct("2024-01-06 10:00:00.000")
+# df_H11 <- filter(H11_off, time > start_time & time < end_time)
+# data_H11 <- fast_extraction_algorithm(df_H11, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+# 
+# start_time <- as.POSIXct("2024-06-13 08:00:00.000")
+# end_time <- as.POSIXct("2024-06-13 09:00:00.000")
+# df_H12 <- filter(H12_off, time > start_time & time < end_time)
+# data_H12 <- fast_extraction_algorithm(df_H12, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+# 
+# start_time <- as.POSIXct("2024-03-12 08:00:00.000")
+# end_time <- as.POSIXct("2024-03-12 09:00:00.000")
+# df_H13 <- filter(H13_off, time > start_time & time < end_time)
+# data_H13 <- fast_extraction_algorithm(df_H13, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+# 
+# start_time <- as.POSIXct("2024-03-12 09:50.000")
+# end_time <- as.POSIXct("2024-03-12 10:20:00.000")
+# df_H14 <- filter(H14_off, time > start_time & time < end_time)
+# data_H14 <- fast_extraction_algorithm(df_H14, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+
+# W6_test1 <- fast_extraction_algorithm(df_walk6, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+# W6_test2 <- fast_extraction_algorithm(df_walk6, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, 0, 0, min_step_period, max_step_period, period_len, period_len_double, 0, 0, thresh_direction, sigma = std_dev)
+# W6_test3 <- fast_extraction_algorithm(df_walk6, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, 0.2, 0.3, min_step_period, max_step_period, period_len, period_len_double, 0.2, 0.3, thresh_direction, sigma = std_dev)
+
+data <- data_W6
+total_steps <- 0
+for(j in data){
+  mvm_steps <- max(j$data$in_step_fw) + max(j$data$in_step_bw)
+  total_steps <- total_steps + mvm_steps 
+}
+total_steps
+```
+
+```{r}
+ordata_walk1 <- Glue_and_classify(data_walk1, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+ordata_walk2 <- Glue_and_classify(data_walk2, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+#ordata_walk3 <- Glue_and_classify(data_walk3, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+#ordata_walk4 <- Glue_and_classify(data_walk4, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+#ordata_walk5 <- Glue_and_classify(data_walk5, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+ordata_walk6 <- Glue_and_classify(data_walk6, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+ordata_walk7 <- Glue_and_classify(data_walk7, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+ordata_walk8 <- Glue_and_classify(data_walk8, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+ordata_walk9 <- Glue_and_classify(data_walk9, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+ordata_walk10 <- Glue_and_classify(data_walk10, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+
+#ordata_walk2_low <- Glue_and_classify(data_walk2_low, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+ordata_walk3_low <- Glue_and_classify(data_walk3_low, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+ordata_walk4_low <- Glue_and_classify(data_walk4_low, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+ordata_walk5_low <- Glue_and_classify(data_walk5_low, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+
+ordata_H10 <- Glue_and_classify(data_H10, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+ordata_H11 <- Glue_and_classify(data_H11, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+ordata_H12 <- Glue_and_classify(data_H12, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+ordata_H13 <- Glue_and_classify(data_H13, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+ordata_H14 <- Glue_and_classify(data_H14, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+```
+
+## Filter functions
+```{r}
+filter_example <- function(mvm){
+  if((mvm$main_freq < 15) & (mvm$movement_type != "Cycle")){
+    return(T)
+  } else{
+    return(F)
+  }
+}
+
+filter_none <- function(mvm){
+  return(T)
+}
+
+filter_cycling <- function(mvm){
+  if(mvm$movement_type != "Cycle"){
+    return(T)
+  } else{
+    return(F)
+  }
+}
+```
+
+## Distance functions
+```{r}
+sumabsdiff <- function(seq1, seq2){
+  return(sum(abs(seq1 - seq2)))
+}
+sumsquarediff <- function(seq1, seq2){
+  return(sum(seq1 - seq2)^2)
+}
+idc_at_distance <- function(seq1, seq2){
+  length(which(abs(seq1 - seq2) > 0.25))
+}
+max_distance <- function(seq1, seq2){
+  max(abs(seq1 - seq2))
+}
+
+#Invariant distance functions
+sign_disagree <- function(seq1, seq2){
+  return(sum(sign(seq1) != sign(seq2)))
+}
+
+sign_disagree_fac2 <- function(seq1, seq2){
+  return( sum( (sign(seq1) != sign(seq2)) | (abs(seq1) > 2*abs(seq2)) | (abs(seq2) > 2*abs(seq1))  ))
+}
+
+peak_height <- function(seq1, seq2){
+  return(abs(max(abs(seq1)) - max(abs(seq2))))
+} #Replaced by infinity norm !!!
+
+peak_height_rel <- function(seq1, seq2){
+  return( max((max(abs(seq1)))/(max(abs(seq2))), (max(abs(seq2)))/(max(abs(seq1)))) - 1   )
+}
+
+cosine_similarity <- function(seq1, seq2){
+  return(1 - (sum(seq1 * seq2)) / ((sqrt(sum(seq1^2)) * sqrt(sum(seq2^2)))))
+}
+
+correlation_distance <- function(seq1, seq2){
+  return(1 - cor(seq1, seq2))
+}
+
+sumabsscaled <- function(seq1, seq2){
+  diff <- sum(abs(seq1 - seq2))
+  return(diff/(mean(abs(seq1))/2 + mean(abs(seq2))/2)) 
+  #If one value is twice as high everywhere would need to divide by two
+  #No problem that it is not perfect/constant no problem if we choose robust parameters
+}
+
+rescaled_inf_norm <- function(seq1, seq2){
+  seq1s <- scale(seq1, center = T, scale = T)
+  seq2s <- scale(seq2, center = T, scale = T)
+  return( max(abs(seq1s - seq2s)) )
+}
+
+#Old invariant distance functions
+
+sumabsdiffpercentage <- function(seq1, seq2){ #So puts more weight on differences at low values than at high values
+  return(sum(abs(seq1 - seq2)/(abs(seq1)/2 + abs(seq2)/2)))
+}
+  
+rescaled_sumabsdiff <- function(seq1, seq2){ #1 norm
+  seq1s <- scale(seq1, center = T, scale = T)
+  seq2s <- scale(seq2, center = T, scale = T)
+  sum_abs_diff <- sum(abs(seq1s - seq2s))
+  return(sum_abs_diff)
+}
+
+rescaled_sumsquared <- function(seq1, seq2){ #Squared 2 norm
+  seq1s <- scale(seq1, center = T, scale = T)
+  seq2s <- scale(seq2, center = T, scale = T)
+  sum_abs_diff <- sum((seq1s - seq2s)^2)
+  return(sum_abs_diff)
+}
+
+#Alternatives should take some parameter that depends on the data for it to be invariant!
+```
+
+## Actual code ``short version''
+
+```{r}
+short_dataframes_walk1 <- full_steps(ordata_walk1, 80, filter_none)
+short_dataframes_walk2 <- full_steps(ordata_walk2, 80, filter_none) 
+short_dataframes_walk3 <- full_steps(ordata_walk3_low, 80, filter_none) #Mind the low
+short_dataframes_walk4 <- full_steps(ordata_walk4_low, 80, filter_none) #Mind the low
+short_dataframes_walk5 <- full_steps(ordata_walk5_low, 80, filter_none) #Mind the low
+short_dataframes_walk6 <- full_steps(ordata_walk6, 80, filter_none)
+short_dataframes_walk7 <- full_steps(ordata_walk7, 80, filter_none)
+short_dataframes_walk8 <- full_steps(ordata_walk8, 80, filter_none)
+short_dataframes_walk9 <- full_steps(ordata_walk9, 80, filter_none)
+short_dataframes_walk10 <- full_steps(ordata_walk10, 80, filter_none)
+
+short_distance_data_walk1_sgn <- full_groups(short_dataframes_walk1[[2]], sign_disagree)
+short_distance_data_walk2_sgn <- full_groups(short_dataframes_walk2[[2]], sign_disagree)
+short_distance_data_walk3_sgn <- full_groups(short_dataframes_walk3[[2]], sign_disagree)
+short_distance_data_walk4_sgn <- full_groups(short_dataframes_walk4[[2]], sign_disagree)
+short_distance_data_walk5_sgn <- full_groups(short_dataframes_walk5[[2]], sign_disagree)
+short_distance_data_walk6_sgn <- full_groups(short_dataframes_walk6[[2]], sign_disagree)
+short_distance_data_walk7_sgn <- full_groups(short_dataframes_walk7[[2]], sign_disagree)
+short_distance_data_walk8_sgn <- full_groups(short_dataframes_walk8[[2]], sign_disagree)
+short_distance_data_walk9_sgn <- full_groups(short_dataframes_walk9[[2]], sign_disagree)
+short_distance_data_walk10_sgn <- full_groups(short_dataframes_walk10[[2]], sign_disagree)
+
+short_distance_data_walk1_peak <- full_groups(short_dataframes_walk1[[2]], peak_height)
+short_distance_data_walk2_peak <- full_groups(short_dataframes_walk2[[2]], peak_height)
+short_distance_data_walk3_peak <- full_groups(short_dataframes_walk3[[2]], peak_height)
+short_distance_data_walk4_peak <- full_groups(short_dataframes_walk4[[2]], peak_height)
+short_distance_data_walk5_peak <- full_groups(short_dataframes_walk5[[2]], peak_height)
+short_distance_data_walk6_peak <- full_groups(short_dataframes_walk6[[2]], peak_height)
+short_distance_data_walk7_peak <- full_groups(short_dataframes_walk7[[2]], peak_height)
+short_distance_data_walk8_peak <- full_groups(short_dataframes_walk8[[2]], peak_height)
+short_distance_data_walk9_peak <- full_groups(short_dataframes_walk9[[2]], peak_height)
+short_distance_data_walk10_peak <- full_groups(short_dataframes_walk10[[2]], peak_height)
+
+short_distance_data_walk1_prel <- full_groups(short_dataframes_walk1[[2]], peak_height_rel)
+short_distance_data_walk2_prel <- full_groups(short_dataframes_walk2[[2]], peak_height_rel)
+short_distance_data_walk3_prel <- full_groups(short_dataframes_walk3[[2]], peak_height_rel)
+short_distance_data_walk4_prel <- full_groups(short_dataframes_walk4[[2]], peak_height_rel)
+short_distance_data_walk5_prel <- full_groups(short_dataframes_walk5[[2]], peak_height_rel)
+short_distance_data_walk6_prel <- full_groups(short_dataframes_walk6[[2]], peak_height_rel)
+short_distance_data_walk7_prel <- full_groups(short_dataframes_walk7[[2]], peak_height_rel)
+short_distance_data_walk8_prel <- full_groups(short_dataframes_walk8[[2]], peak_height_rel)
+short_distance_data_walk9_prel <- full_groups(short_dataframes_walk9[[2]], peak_height_rel)
+short_distance_data_walk10_prel <- full_groups(short_dataframes_walk10[[2]], peak_height_rel)
+
+short_distance_data_walk1_cos <- full_groups(short_dataframes_walk1[[2]], cosine_similarity)
+short_distance_data_walk2_cos <- full_groups(short_dataframes_walk2[[2]], cosine_similarity)
+short_distance_data_walk3_cos <- full_groups(short_dataframes_walk3[[2]], cosine_similarity)
+short_distance_data_walk4_cos <- full_groups(short_dataframes_walk4[[2]], cosine_similarity)
+short_distance_data_walk5_cos <- full_groups(short_dataframes_walk5[[2]], cosine_similarity)
+short_distance_data_walk6_cos <- full_groups(short_dataframes_walk6[[2]], cosine_similarity)
+short_distance_data_walk7_cos <- full_groups(short_dataframes_walk7[[2]], cosine_similarity)
+short_distance_data_walk8_cos <- full_groups(short_dataframes_walk8[[2]], cosine_similarity)
+short_distance_data_walk9_cos <- full_groups(short_dataframes_walk9[[2]], cosine_similarity)
+short_distance_data_walk10_cos <- full_groups(short_dataframes_walk10[[2]], cosine_similarity)
+
+short_distance_data_walk1_cor <- full_groups(short_dataframes_walk1[[2]], correlation_distance)
+short_distance_data_walk2_cor <- full_groups(short_dataframes_walk2[[2]], correlation_distance)
+short_distance_data_walk3_cor <- full_groups(short_dataframes_walk3[[2]], correlation_distance)
+short_distance_data_walk4_cor <- full_groups(short_dataframes_walk4[[2]], correlation_distance)
+short_distance_data_walk5_cor <- full_groups(short_dataframes_walk5[[2]], correlation_distance)
+short_distance_data_walk6_cor <- full_groups(short_dataframes_walk6[[2]], correlation_distance)
+short_distance_data_walk7_cor <- full_groups(short_dataframes_walk7[[2]], correlation_distance)
+short_distance_data_walk8_cor <- full_groups(short_dataframes_walk8[[2]], correlation_distance)
+short_distance_data_walk9_cor <- full_groups(short_dataframes_walk9[[2]], correlation_distance)
+short_distance_data_walk10_cor <- full_groups(short_dataframes_walk10[[2]], correlation_distance)
+
+short_distance_data_walk1_sas <- full_groups(short_dataframes_walk1[[2]], sumabsscaled)
+short_distance_data_walk2_sas <- full_groups(short_dataframes_walk2[[2]], sumabsscaled)
+short_distance_data_walk3_sas <- full_groups(short_dataframes_walk3[[2]], sumabsscaled)
+short_distance_data_walk4_sas <- full_groups(short_dataframes_walk4[[2]], sumabsscaled)
+short_distance_data_walk5_sas <- full_groups(short_dataframes_walk5[[2]], sumabsscaled)
+short_distance_data_walk6_sas <- full_groups(short_dataframes_walk6[[2]], sumabsscaled)
+short_distance_data_walk7_sas <- full_groups(short_dataframes_walk7[[2]], sumabsscaled)
+short_distance_data_walk8_sas <- full_groups(short_dataframes_walk8[[2]], sumabsscaled)
+short_distance_data_walk9_sas <- full_groups(short_dataframes_walk9[[2]], sumabsscaled)
+short_distance_data_walk10_sas <- full_groups(short_dataframes_walk10[[2]], sumabsscaled)
+
+short_distance_data_walk1_resq <- full_groups(short_dataframes_walk1[[2]], rescaled_sumsquared)
+short_distance_data_walk2_resq <- full_groups(short_dataframes_walk2[[2]], rescaled_sumsquared)
+short_distance_data_walk3_resq <- full_groups(short_dataframes_walk3[[2]], rescaled_sumsquared)
+short_distance_data_walk4_resq <- full_groups(short_dataframes_walk4[[2]], rescaled_sumsquared)
+short_distance_data_walk5_resq <- full_groups(short_dataframes_walk5[[2]], rescaled_sumsquared)
+short_distance_data_walk6_resq <- full_groups(short_dataframes_walk6[[2]], rescaled_sumsquared)
+short_distance_data_walk7_resq <- full_groups(short_dataframes_walk7[[2]], rescaled_sumsquared)
+short_distance_data_walk8_resq <- full_groups(short_dataframes_walk8[[2]], rescaled_sumsquared)
+short_distance_data_walk9_resq <- full_groups(short_dataframes_walk9[[2]], rescaled_sumsquared)
+short_distance_data_walk10_resq <- full_groups(short_dataframes_walk10[[2]], rescaled_sumsquared)
+
+short_distance_data_walk1_redi <- full_groups(short_dataframes_walk1[[2]], rescaled_sumabsdiff)
+short_distance_data_walk2_redi <- full_groups(short_dataframes_walk2[[2]], rescaled_sumabsdiff) 
+short_distance_data_walk3_redi <- full_groups(short_dataframes_walk3[[2]], rescaled_sumabsdiff)
+short_distance_data_walk4_redi <- full_groups(short_dataframes_walk4[[2]], rescaled_sumabsdiff)
+short_distance_data_walk5_redi <- full_groups(short_dataframes_walk5[[2]], rescaled_sumabsdiff)
+short_distance_data_walk6_redi <- full_groups(short_dataframes_walk6[[2]], rescaled_sumabsdiff)
+short_distance_data_walk7_redi <- full_groups(short_dataframes_walk7[[2]], rescaled_sumabsdiff)
+short_distance_data_walk8_redi <- full_groups(short_dataframes_walk8[[2]], rescaled_sumabsdiff)
+short_distance_data_walk9_redi <- full_groups(short_dataframes_walk9[[2]], rescaled_sumabsdiff)
+short_distance_data_walk10_redi <- full_groups(short_dataframes_walk10[[2]], rescaled_sumabsdiff)
+
+short_distance_data_walk1_sgn2 <- full_groups(short_dataframes_walk1[[2]], sign_disagree_fac2)
+short_distance_data_walk2_sgn2 <- full_groups(short_dataframes_walk2[[2]], sign_disagree_fac2)
+short_distance_data_walk3_sgn2 <- full_groups(short_dataframes_walk3[[2]], sign_disagree_fac2)
+short_distance_data_walk4_sgn2 <- full_groups(short_dataframes_walk4[[2]], sign_disagree_fac2)
+short_distance_data_walk5_sgn2 <- full_groups(short_dataframes_walk5[[2]], sign_disagree_fac2)
+short_distance_data_walk6_sgn2 <- full_groups(short_dataframes_walk6[[2]], sign_disagree_fac2)
+short_distance_data_walk7_sgn2 <- full_groups(short_dataframes_walk7[[2]], sign_disagree_fac2)
+short_distance_data_walk8_sgn2 <- full_groups(short_dataframes_walk8[[2]], sign_disagree_fac2)
+short_distance_data_walk9_sgn2 <- full_groups(short_dataframes_walk9[[2]], sign_disagree_fac2)
+short_distance_data_walk10_sgn2 <- full_groups(short_dataframes_walk10[[2]], sign_disagree_fac2)
+
+short_distance_data_walk1_inf <- full_groups(short_dataframes_walk1[[2]], rescaled_inf_norm)
+short_distance_data_walk2_inf <- full_groups(short_dataframes_walk2[[2]], rescaled_inf_norm)
+short_distance_data_walk3_inf <- full_groups(short_dataframes_walk3[[2]], rescaled_inf_norm)
+short_distance_data_walk4_inf <- full_groups(short_dataframes_walk4[[2]], rescaled_inf_norm)
+short_distance_data_walk5_inf <- full_groups(short_dataframes_walk5[[2]], rescaled_inf_norm)
+short_distance_data_walk6_inf <- full_groups(short_dataframes_walk6[[2]], rescaled_inf_norm)
+short_distance_data_walk7_inf <- full_groups(short_dataframes_walk7[[2]], rescaled_inf_norm)
+short_distance_data_walk8_inf <- full_groups(short_dataframes_walk8[[2]], rescaled_inf_norm)
+short_distance_data_walk9_inf <- full_groups(short_dataframes_walk9[[2]], rescaled_inf_norm)
+short_distance_data_walk10_inf <- full_groups(short_dataframes_walk10[[2]], rescaled_inf_norm)
+#Testing why suddenly so different
+#distance_W61 <- full_groups(short_W61[[2]], sumabsscaled)
+```
+
+Visualisation stored in separate pdf files
+```{r}
+names <- c("W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9", "W10")
+no_to_compare_half <- 30
+sas_data <- c()
+sgn_data <- c()
+cor_data <- c()
+peak_data <- c()
+cos_data <- c()
+sgn2_data <- c()
+resq_data <- c()
+redi_data <- c()
+prel_data <- c()
+inf_data <- c()
+
+
+for(j in 1:10){
+  clustering <- c()
+  data <- get(paste0("short_distance_data_walk", j, "_sas"))
+  D <- data[[1]]
+  density <- 68
+  points <- 2
+  
+  #print((noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)))
+  # print(nrow(D))
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+  
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  # print(coords$cluster)
+  
+  print(sum(clustering == 0)/length(clustering))
+  sas_data <- append(sas_data, sum(clustering == 0)/length(clustering))
+    
+  
+  assign(paste0("inf_walk", j) , plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(size = 4)) %>%
+         layout(title = paste0("Absolute rescaled sum of differences in vertical acceleration, ", names[j]),
+                legend = list(title = list(text = "Group"))))
+}
+
+for(j in 1:10){
+  clustering <- c()
+  data <- get(paste0("short_distance_data_walk", j, "_sgn"))
+  D <- data[[1]]
+  density <- 16
+  points <- 2
+  
+  # print((noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)))
+  # print(nrow(D))
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+  
+  print(sum(clustering == 0)/length(clustering))
+  sgn_data <- append(sgn_data, sum(clustering == 0)/length(clustering))
+    
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  
+  assign(paste0("sgn_walk", j) , plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(size = 4)) %>%
+         layout(title = paste0("Differences in sign in vertical acceleration, ", names[j]),
+                legend = list(title = list(text = "Group"))))
+}
+
+for(j in 1:10){
+  clustering <- c()
+  data <- get(paste0("short_distance_data_walk", j, "_inf"))
+  D <- data[[1]]
+  density <- 1.83
+  points <- 2
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+  
+  print(sum(clustering == 0)/length(clustering))
+  inf_data <- append(inf_data, sum(clustering == 0)/length(clustering))
+    
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  
+  assign(paste0("inf_walk", j) , plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(size = 4)) %>%
+         layout(title = paste0("Infinity norm difference vertical acceleration, ", names[j]),
+                legend = list(title = list(text = "Group"))))
+}
+
+for(j in 1:10){
+  clustering <- c()
+  data <- get(paste0("short_distance_data_walk", j, "_cor"))
+  D <- data[[1]]
+  density <- 0.3
+  points <- 2
+  
+  # print((noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)))
+  # print(nrow(D))
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+  
+  print(sum(clustering == 0)/length(clustering))
+  cor_data <- append(cor_data, sum(clustering == 0)/length(clustering))
+    
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  
+  assign(paste0("cor_walk", j) , plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(size = 4)) %>%
+         layout(title = paste0("Differences in correlation in vertical acceleration, ", names[j]),
+                legend = list(title = list(text = "Group"))))
+}
+
+for(j in 1:10){
+  clustering <- c()
+  data <- get(paste0("short_distance_data_walk", j, "_cos"))
+  D <- data[[1]]
+  density <- 0.32
+  points <- 2
+  
+  # print((noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)))
+  # print(nrow(D))
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+  
+  print(sum(clustering == 0)/length(clustering))
+  cos_data <- append(cos_data, sum(clustering == 0)/length(clustering))
+  
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  
+  assign(paste0("cos_walk", j) , plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(size = 4)) %>%
+         layout(title = paste0("Differences in cosine similarity in vertical acceleration, ", names[j]),
+                legend = list(title = list(text = "Group"))))
+}
+
+for(j in 1:10){
+  clustering <- c()
+  data <- get(paste0("short_distance_data_walk", j, "_peak"))
+  D <- data[[1]]
+  density <- 0.1
+  points <- 2
+  
+  #print((noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)))
+  # print(nrow(D))
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+  
+  print(sum(clustering == 0)/length(clustering))
+  peak_data <- append(peak_data, sum(clustering == 0)/length(clustering))
+  
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  
+  assign(paste0("peak_walk", j) , plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(size = 4)) %>%
+         layout(title = paste0("Differences in absolute maximum of vertical acceleration, ", names[j]),
+                legend = list(title = list(text = "Group"))))
+}
+
+for(j in 1:10){
+  clustering <- c()
+  data <- get(paste0("short_distance_data_walk", j, "_sgn2"))
+  D <- data[[1]]
+  density <- 44
+  points <- 2
+  
+  #print((noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)))
+  # print(nrow(D))
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+  
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  # print(coords$cluster)
+  
+  print(sum(clustering == 0)/length(clustering))
+  sgn2_data <- append(sgn2_data, sum(clustering == 0)/length(clustering))
+    
+  
+  assign(paste0("sgn2_walk", j) , plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(size = 4)) %>%
+         layout(title = paste0("Different sign or absolute difference at least a factor 2, ", names[j]),
+                legend = list(title = list(text = "Group"))))
+}
+
+for(j in 1:10){
+  clustering <- c()
+  data <- get(paste0("short_distance_data_walk", j, "_resq"))
+  D <- data[[1]]
+  density <- 48
+  points <- 2
+  
+  #print((noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)))
+  # print(nrow(D))
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+  
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  # print(coords$cluster)
+  
+  print(sum(clustering == 0)/length(clustering))
+  resq_data <- append(resq_data, sum(clustering == 0)/length(clustering))
+    
+  
+  assign(paste0("resq_walk", j) , plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(size = 4)) %>%
+         layout(title = paste0("Rescaled square distance, ", names[j]),
+                legend = list(title = list(text = "Group"))))
+}
+
+for(j in 1:10){
+  clustering <- c()
+  data <- get(paste0("short_distance_data_walk", j, "_redi"))
+  D <- data[[1]]
+  density <- 48
+  points <- 2
+  
+  #print((noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)))
+  # print(nrow(D))
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+  
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  # print(coords$cluster)
+  
+  print(sum(clustering == 0)/length(clustering))
+  redi_data <- append(redi_data, sum(clustering == 0)/length(clustering))
+    
+  
+  assign(paste0("redi_walk", j) , plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(size = 4)) %>%
+         layout(title = paste0("Squared rescaled sum difference, ", names[j]),
+                legend = list(title = list(text = "Group"))))
+}
+
+for(j in 1:10){
+  clustering <- c()
+  data <- get(paste0("short_distance_data_walk", j, "_prel"))
+  D <- data[[1]]
+  density <- 1.09
+  points <- 2
+  
+  #print((noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)))
+  # print(nrow(D))
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+  
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  # print(coords$cluster)
+  
+  print(sum(clustering == 0)/length(clustering))
+  prel_data <- append(prel_data, sum(clustering == 0)/length(clustering))
+    
+  
+  assign(paste0("prel_walk", j) , plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(size = 4)) %>%
+         layout(title = paste0("Relative difference in peak height, ", names[j]),
+                legend = list(title = list(text = "Group"))))
+}
+
+# for(j in 1:10){
+#   clustering <- c()
+#   data <- get(paste0("short_distance_data_walk", j, "_inf"))
+#   D <- data[[1]]
+#   density <- 0.6
+#   points <- 2
+#   
+#   #print((noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)))
+#   # print(nrow(D))
+#   
+#   clustering <- numeric(nrow(D))
+#   for(k in 1:nrow(D)){
+#     if(k > nrow(D) - no_to_compare_half){
+#       max_idx <- nrow(D)
+#       min_idx <- nrow(D) - 2*no_to_compare_half
+#     } else if(k < (no_to_compare_half + 1)){
+#       max_idx <- no_to_compare_half * 2 + 1
+#       min_idx <- 1
+#     } else{
+#       min_idx <- k - no_to_compare_half
+#       max_idx <- k + no_to_compare_half
+#     }
+#   close_points <- 0
+#   for(l in min_idx:max_idx){
+#     if(D[k, l] < density){
+#       close_points <- close_points + 1 #Always close to itself
+#     }
+#   }
+#   if(close_points > points){
+#     clustering[k] <- 1
+#   } else{
+#     clustering[k] <- 0
+#   }
+#   }
+#   
+#   mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+#   
+#   coords <- as.data.frame(mds_result$points)
+#   colnames(coords) <- c("X", "Y", "Z")
+#   
+#   coords$cluster <- clustering
+#   coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+#   # print(coords$cluster)
+#   
+#   print(sum(clustering == 0)/length(clustering))
+#   inf_data <- append(inf_data, sum(clustering == 0)/length(clustering))
+#     
+#   
+#   assign(paste0("sas_walk", j) , plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+#         type = 'scatter3d', mode = 'markers',
+#         marker = list(size = 4)) %>%
+#          layout(title = paste0("Absolute rescaled sum of differences in vertical acceleration, ", names[j]),
+#                 legend = list(title = list(text = "Group"))))
+# }
+```
+
+```{r}
+# for(i in 1:10){
+#   for(j in c("sas", "cor", "cos", "peak", "sgn", "sgn2", "resq", "redi", "prel")){
+#     plot <- get(paste0(j, "_walk", i))
+#     saveWidget(plot, paste0(j, "_", names[i], ".html"), selfcontained = T)
+#   }
+# }
+```
+
+```{r}
+methodcore_local30_points2_df <- data.frame(name = names, sas = sas_data, cos = cos_data, cor = cor_data, sgn = sgn_data, sgn2 = sgn2_data, rel_peak = prel_data, resq = resq_data, redi = redi_data, inf = inf_data)
+```
+
+```{r}
+names <- c("W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9", "W10")
+no_to_compare_half <- 30
+sas_data <- c()
+sgn_data <- c()
+cor_data <- c()
+peak_data <- c()
+cos_data <- c()
+sgn2_data <- c()
+resq_data <- c()
+redi_data <- c()
+prel_data <- c()
+inf_data <- c()
+
+for(j in 1:10){
+  clustering <- c()
+  data <- get(paste0("short_distance_data_walk", j, "_inf"))
+  D <- data[[1]]
+  density <- 2.14
+  points <- 10
+  
+  #print((noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)))
+  # print(nrow(D))
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+  
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  # print(coords$cluster)
+  
+  print(sum(clustering == 0)/length(clustering))
+  inf_data <- append(inf_data, sum(clustering == 0)/length(clustering))
+    
+  
+  assign(paste0("inf_walk", j) , plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(size = 4)) %>%
+         layout(title = paste0("Inf norm of vertical acceleration, ", names[j]),
+                legend = list(title = list(text = "Group"))))
+}
+
+# for(j in 1:10){
+#   clustering <- c()
+#   data <- get(paste0("short_distance_data_walk", j, "_cos"))
+#   D <- data[[1]]
+#   density <- 0.45
+#   points <- 10
+#   
+#   #print((noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)))
+#   # print(nrow(D))
+#   
+#   clustering <- numeric(nrow(D))
+#   for(k in 1:nrow(D)){
+#     if(k > nrow(D) - no_to_compare_half){
+#       max_idx <- nrow(D)
+#       min_idx <- nrow(D) - 2*no_to_compare_half
+#     } else if(k < (no_to_compare_half + 1)){
+#       max_idx <- no_to_compare_half * 2 + 1
+#       min_idx <- 1
+#     } else{
+#       min_idx <- k - no_to_compare_half
+#       max_idx <- k + no_to_compare_half
+#     }
+#   close_points <- 0
+#   for(l in min_idx:max_idx){
+#     if(D[k, l] < density){
+#       close_points <- close_points + 1 #Always close to itself
+#     }
+#   }
+#   if(close_points > points){
+#     clustering[k] <- 1
+#   } else{
+#     clustering[k] <- 0
+#   }
+#   }
+#   
+#   mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+#   
+#   coords <- as.data.frame(mds_result$points)
+#   colnames(coords) <- c("X", "Y", "Z")
+#   
+#   coords$cluster <- clustering
+#   coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+#   # print(coords$cluster)
+#   
+#   print(sum(clustering == 0)/length(clustering))
+#   cos_data <- append(cos_data, sum(clustering == 0)/length(clustering))
+#     
+#   
+#   assign(paste0("cos_walk", j) , plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+#         type = 'scatter3d', mode = 'markers',
+#         marker = list(size = 4)) %>%
+#          layout(title = paste0("Cosine dissimilarity between vertical acceleration, ", names[j]),
+#                 legend = list(title = list(text = "Group"))))
+# }
+
+for(j in 1:10){
+  clustering <- c()
+  data <- get(paste0("short_distance_data_walk", j, "_sas"))
+  D <- data[[1]]
+  density <- 82
+  points <- 10
+  
+  #print((noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)))
+  # print(nrow(D))
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+  
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  # print(coords$cluster)
+  
+  print(sum(clustering == 0)/length(clustering))
+  sas_data <- append(sas_data, sum(clustering == 0)/length(clustering))
+    
+  
+  assign(paste0("sas_walk", j) , plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(size = 4)) %>%
+         layout(title = paste0("Absolute rescaled sum of differences in vertical acceleration, ", names[j]),
+                legend = list(title = list(text = "Group"))))
+}
+
+
+for(j in 1:10){
+  clustering <- c()
+  data <- get(paste0("short_distance_data_walk", j, "_sgn"))
+  D <- data[[1]]
+  density <- 21
+  points <- 10
+  
+  # print((noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)))
+  # print(nrow(D))
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+  
+  print(sum(clustering == 0)/length(clustering))
+  sgn_data <- append(sgn_data, sum(clustering == 0)/length(clustering))
+    
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  
+  assign(paste0("sgn_walk", j) , plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(size = 4)) %>%
+         layout(title = paste0("Differences in sign in vertical acceleration, ", names[j]),
+                legend = list(title = list(text = "Group"))))
+}
+
+for(j in 1:10){
+  clustering <- c()
+  data <- get(paste0("short_distance_data_walk", j, "_cor"))
+  D <- data[[1]]
+  density <- 0.44
+  points <- 10
+  
+  # print((noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)))
+  # print(nrow(D))
+  
+   clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+  
+  print(sum(clustering == 0)/length(clustering))
+  cor_data <- append(cor_data, sum(clustering == 0)/length(clustering))
+    
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  
+  assign(paste0("cor_walk", j) , plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(size = 4)) %>%
+         layout(title = paste0("Differences in correlation in vertical acceleration, ", names[j]),
+                legend = list(title = list(text = "Group"))))
+}
+
+for(j in 1:10){
+  clustering <- c()
+  data <- get(paste0("short_distance_data_walk", j, "_cos"))
+  D <- data[[1]]
+  density <- 0.45
+  points <- 10
+  
+  # print((noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)))
+  # print(nrow(D))
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+  
+  print(sum(clustering == 0)/length(clustering))
+  cos_data <- append(cos_data, sum(clustering == 0)/length(clustering))
+  
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  
+  assign(paste0("cos_walk", j) , plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(size = 4)) %>%
+         layout(title = paste0("Differences in cosine similarity in vertical acceleration, ", names[j]),
+                legend = list(title = list(text = "Group"))))
+}
+
+for(j in 1:10){
+  clustering <- c()
+  data <- get(paste0("short_distance_data_walk", j, "_peak"))
+  D <- data[[1]]
+  density <- 0.4
+  points <- 10
+  
+  #print((noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)))
+  # print(nrow(D))
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+  
+  print(sum(clustering == 0)/length(clustering))
+  peak_data <- append(peak_data, sum(clustering == 0)/length(clustering))
+  
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  
+  assign(paste0("peak_walk", j) , plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(size = 4)) %>%
+         layout(title = paste0("Differences in absolute maximum of vertical acceleration, ", names[j]),
+                legend = list(title = list(text = "Group"))))
+}
+
+for(j in 1:10){
+  clustering <- c()
+  data <- get(paste0("short_distance_data_walk", j, "_sgn2"))
+  D <- data[[1]]
+  density <- 50
+  points <- 10
+  
+  #print((noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)))
+  # print(nrow(D))
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+  
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  # print(coords$cluster)
+  
+  print(sum(clustering == 0)/length(clustering))
+  sgn2_data <- append(sgn2_data, sum(clustering == 0)/length(clustering))
+    
+  
+  assign(paste0("sgn2_walk", j) , plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(size = 4)) %>%
+         layout(title = paste0("Different sign or absolute difference at least a factor 2, ", names[j]),
+                legend = list(title = list(text = "Group"))))
+}
+
+for(j in 1:10){
+  clustering <- c()
+  data <- get(paste0("short_distance_data_walk", j, "_resq"))
+  D <- data[[1]]
+  density <- 67
+  points <- 10
+  
+  #print((noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)))
+  # print(nrow(D))
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+  
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  # print(coords$cluster)
+  
+  print(sum(clustering == 0)/length(clustering))
+  resq_data <- append(resq_data, sum(clustering == 0)/length(clustering))
+    
+  
+  assign(paste0("resq_walk", j) , plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(size = 4)) %>%
+         layout(title = paste0("Rescaled square distance, ", names[j]),
+                legend = list(title = list(text = "Group"))))
+}
+
+for(j in 1:10){
+  clustering <- c()
+  data <- get(paste0("short_distance_data_walk", j, "_redi"))
+  D <- data[[1]]
+  density <- 57
+  points <- 10
+  
+  #print((noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)))
+  # print(nrow(D))
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+  
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  # print(coords$cluster)
+  
+  print(sum(clustering == 0)/length(clustering))
+  redi_data <- append(redi_data, sum(clustering == 0)/length(clustering))
+    
+  
+  assign(paste0("redi_walk", j) , plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(size = 4)) %>%
+         layout(title = paste0("Squared rescaled sum difference, ", names[j]),
+                legend = list(title = list(text = "Group"))))
+}
+
+for(j in 1:10){
+  clustering <- c()
+  data <- get(paste0("short_distance_data_walk", j, "_prel"))
+  D <- data[[1]]
+  density <- 1.41
+  points <- 10
+  
+  #print((noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)))
+  # print(nrow(D))
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+  
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  # print(coords$cluster)
+  
+  print(sum(clustering == 0)/length(clustering))
+  prel_data <- append(prel_data, sum(clustering == 0)/length(clustering))
+    
+  
+  assign(paste0("prel_walk", j) , plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(size = 4)) %>%
+         layout(title = paste0("Relative difference in peak height, ", names[j]),
+                legend = list(title = list(text = "Group"))))
+}
+```
+
+```{r}
+methodcore_local30_points10_df <- data.frame(name = names, sas = sas_data, cos = cos_data, cor = cor_data, sgn = sgn_data, sgn2 = sgn2_data, rel_peak = prel_data, resq = resq_data, redi = redi_data, inf = inf_data)
+```
+
+```{r}
+names <- c("W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9", "W10")
+sas_data <- c()
+sgn_data <- c()
+cor_data <- c()
+peak_data <- c()
+cos_data <- c()
+sgn2_data <- c()
+resq_data <- c()
+redi_data <- c()
+prel_data <- c()
+
+  
+thresholds <- c(80, 20, 0.42, 0.32, 0.44, 47, 65, 57, 1.3)
+distances <- c("sas", "sgn", "cor", "peak", "cos", "sgn2", "resq", "redi", "prel")
+titiles <- c("Title1", "Title2", "Title3", "Title4", "Title5", "Title6", "Title7", "Title8", "Title9")
+
+for(k in 1:length(thresholds)){
+  for(j in 1:10){
+    clustering <- c()
+    data <- get(paste0("short_distance_data_walk", j, "_", distances[k]))
+    D <- data[[1]]
+  
+    pam_result <- pam(D, k = 4, diss = TRUE)
+    medoids <- pam_result$medoids
+    medoid_indices <- pam_result$id.med
+    clustering <- unlist(pam_result$clustering)
+  
+    min_dist_to_medoid <- apply(D[, medoid_indices], 1, min)
+    threshold <- thresholds[k]
+    noise_points <- which(min_dist_to_medoid > threshold)
+  
+    clustering[noise_points] <-  0
+    assign(paste0("clustering_walk", j, "_", distances[k]), clustering)
+    #print(sum(clustering == 0)/length(clustering))
+    assign(paste0(distances[k], "_data"), append(get(paste0(distances[k], "_data")), sum(clustering == 0)/length(clustering)))
+  
+    mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+    coords <- as.data.frame(mds_result$points)
+    colnames(coords) <- c("X", "Y", "Z")
+    coords$cluster <- clustering
+    coords$cluster <- factor(coords$cluster, levels = c(0, 1, 2, 3, 4), labels = c("Noise", "Group1",
+                                                                                   "Group2", "Group3",
+                                                                                   "Group4"))
+  
+#   assign(paste0(distances[k], "_walk", j) , plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+#         type = 'scatter3d', mode = 'markers',
+#         marker = list(size = 4)) %>%
+#          layout(title = paste0(distances[k], " ", names[j]),
+#                 legend = list(title = list(text = "Group"))))
+#   
+# assign(paste0(distances[k], "_walk", j),
+#   plot_ly() %>%
+#     # Add line trace (all points connected)
+#     add_trace(
+#       data = coords,
+#       x = ~X, y = ~Y, z = ~Z,
+#       type = 'scatter3d',
+#       mode = 'lines',
+#       line = list(color = 'gray'),
+#       showlegend = FALSE
+#     ) %>%
+#     # Add marker trace with color by cluster
+#     add_trace(
+#       data = coords,
+#       x = ~X, y = ~Y, z = ~Z,
+#       type = 'scatter3d',
+#       mode = 'markers',
+#       marker = list(size = 4),
+#       color = ~as.factor(cluster)
+#     ) %>%
+#     layout(
+#       title = paste0(distances[k], " ", names[j]),
+#       legend = list(title = list(text = "Group"))
+#     )
+# )
+
+xrange <- range(coords$X)
+yrange <- range(coords$Y)
+zrange <- range(coords$Z)
+max_range <- max(diff(xrange), diff(yrange), diff(zrange))
+xmid <- mean(xrange)
+ymid <- mean(yrange)
+zmid <- mean(zrange)
+axis_limits <- list(
+  xaxis = list(range = c(xmid - max_range/2, xmid + max_range/2)),
+  yaxis = list(range = c(ymid - max_range/2, ymid + max_range/2)),
+  zaxis = list(range = c(zmid - max_range/2, zmid + max_range/2))
+)
+assign(paste0(distances[k], "_walk", j),
+  plot_ly() %>%
+    add_trace(
+      data = coords,
+      x = ~X, y = ~Y, z = ~Z,
+      type = 'scatter3d',
+      mode = 'lines',
+      line = list(color = 'grey'),
+      showlegend = FALSE
+    ) %>%
+    add_trace(
+      data = coords,
+      x = ~X, y = ~Y, z = ~Z,
+      type = 'scatter3d',
+      mode = 'markers',
+      marker = list(size = 4),
+      color = ~as.factor(cluster)
+    ) %>%
+    layout(
+      title = paste0(distances[k], " ", names[j]),
+      legend = list(title = list(text = "Group")),
+      scene = c(
+        list(
+          aspectmode = "manual",
+          aspectratio = list(x = 1, y = 1, z = 1)
+        ),
+        axis_limits
+      )
+    )
+)
+  }
+}
+```
+
+```{r}
+methodmedoid_df <- data.frame(name = names, sas = sas_data, cos = cos_data, cor = cor_data, sgn = sgn_data, sgn2 = sgn2_data, rel_peak = prel_data, resq = resq_data, redi = redi_data)
+```
+
+```{r}
+for(i in 1:10){
+for(j in c("sas", "cor", "cos", "peak", "sgn", "sgn2", "resq", "redi", "prel")){
+    plot <- get(paste0(j, "_walk", i))
+    saveWidget(plot, paste0(j, "_", names[i], ".html"), selfcontained = T)
+  }
+ }
+```
+
+
+Checking if the noise is actual noise and not a fifth group in some sense / if the groups are actually groups
+
+```{r}
+clust <- clustering_walk4_prel
+l <- 0
+
+same <- 0
+diff <- 0
+for(j in 2:length(clust)){
+  if((clust[j] == l) & (clust[j - 1] == l)){
+    same <- same + 1
+  } else if((clust[j] == l) & (clust[j - 1] != l)){
+    diff <- diff + 1
+  }
+}
+(expected_frac <- length(clust[clust == l] - 1)/(length(clust) - 1))
+(actual_frac <- same/(diff + same))
+```
+
+Now Persistable
+```{r}
+#First a simple example to see if it all works
+#... or if too much effort show Persistable to give an idea, but make some automated version that is more objective. Just first try Persistable to get idea for myself. I guess here rescaling to have mean 1 could make sense, purely because the relation between distances does not change and what parameter should be chosen becomes apparent regardless
+
+D <- short_distance_data_walk1_sgn[[1]] 
+mds_result <- cmdscale(as.dist(D), k = nrow(D) - 1, eig = T)
+coords <- as.data.frame(mds_result$points)
+class(coords)
+
+write.csv(coords, "Persistable and Python/coords_walk1_sgn.csv", row.names = FALSE) #Change to take original dissim matrix, not Euclidean approx in few 100 dimensions, although still much better than 2-3 dimensions
+```
+
+
+Next method we use: 
+
+
+## Actual code (older version)
+```{r}
+dataframes_walk1 <- full_steps_old(ordata_walk1, 200, filter_none)
+dataframes_walk2 <- full_steps_old(ordata_walk2, 200, filter_none)
+dataframes_walk3 <- full_steps_old(ordata_walk3, 200, filter_none)
+dataframes_walk4 <- full_steps_old(ordata_walk4, 200, filter_none)
+dataframes_walk5 <- full_steps_old(ordata_walk5, 200, filter_none)
+dataframes_walk6 <- full_steps_old(ordata_walk6, 200, filter_none)
+dataframes_walk7 <- full_steps_old(ordata_walk7, 200, filter_none)
+dataframes_walk8 <- full_steps_old(ordata_walk8, 200, filter_none)
+dataframes_walk9 <- full_steps_old(ordata_walk9, 200, filter_none)
+dataframes_walk10 <- full_steps_old(ordata_walk10, 200, filter_none)
+dataframes_walk2_low <- full_steps_old(ordata_walk2_low, 200, filter_none)
+dataframes_walk3_low <- full_steps_old(ordata_walk3_low, 200, filter_none)
+dataframes_walk4_low <- full_steps_old(ordata_walk4_low, 200, filter_none)
+dataframes_walk5_low <- full_steps_old(ordata_walk5_low, 200, filter_none)
+dataframes_H10 <- full_steps_old(ordata_H10, 200, filter_none)
+dataframes_H11 <- full_steps_old(ordata_H11, 200, filter_none)
+dataframes_H12 <- full_steps_old(ordata_H12, 200, filter_none)
+dataframes_H13 <- full_steps_old(ordata_H13, 200, filter_none)
+dataframes_H14 <- full_steps_old(ordata_H14, 200, filter_none)
+
+distance_data_walk1 <- full_groups(dataframes_walk1[[2]], sign_disagree)
+distance_data_walk2 <- full_groups(dataframes_walk2[[2]], sign_disagree)
+distance_data_walk3 <- full_groups(dataframes_walk3[[2]], sign_disagree)
+distance_data_walk4 <- full_groups(dataframes_walk4[[2]], sign_disagree)
+distance_data_walk5 <- full_groups(dataframes_walk5[[2]], sign_disagree)
+distance_data_walk6 <- full_groups(dataframes_walk6[[2]], sign_disagree)
+distance_data_walk7 <- full_groups(dataframes_walk7[[2]], sign_disagree)
+distance_data_walk8 <- full_groups(dataframes_walk8[[2]], sign_disagree)
+distance_data_walk9 <- full_groups(dataframes_walk9[[2]], sign_disagree)
+distance_data_walk10 <- full_groups(dataframes_walk10[[2]], sign_disagree)
+distance_data_walk2_low <- full_groups(dataframes_walk2_low[[2]], sign_disagree)
+distance_data_walk3_low <- full_groups(dataframes_walk3_low[[2]], sign_disagree)
+distance_data_walk4_low <- full_groups(dataframes_walk4_low[[2]], sign_disagree)
+distance_data_walk5_low <- full_groups(dataframes_walk5_low[[2]], sign_disagree)
+distance_data_H10 <- full_groups(dataframes_H10[[2]], sign_disagree)
+distance_data_H11 <- full_groups(dataframes_H11[[2]], sign_disagree)
+distance_data_H12 <- full_groups(dataframes_H12[[2]], sign_disagree)
+distance_data_H13 <- full_groups(dataframes_H13[[2]], sign_disagree)
+distance_data_H14 <- full_groups(dataframes_H14[[2]], sign_disagree)
+
+distance_data_walk1_adp <- full_groups(dataframes_walk1[[2]], sumabsdiffpercentage)
+distance_data_walk2_adp <- full_groups(dataframes_walk2[[2]], sumabsdiffpercentage)
+distance_data_walk3_adp <- full_groups(dataframes_walk3[[2]], sumabsdiffpercentage)
+distance_data_walk4_adp <- full_groups(dataframes_walk4[[2]], sumabsdiffpercentage)
+distance_data_walk5_adp <- full_groups(dataframes_walk5[[2]], sumabsdiffpercentage)
+distance_data_walk6_adp <- full_groups(dataframes_walk6[[2]], sumabsdiffpercentage)
+distance_data_walk7_adp <- full_groups(dataframes_walk7[[2]], sumabsdiffpercentage)
+distance_data_walk8_adp <- full_groups(dataframes_walk8[[2]], sumabsdiffpercentage)
+distance_data_walk9_adp <- full_groups(dataframes_walk9[[2]], sumabsdiffpercentage)
+distance_data_walk10_adp <- full_groups(dataframes_walk10[[2]], sumabsdiffpercentage)
+distance_data_walk2_low_adp <- full_groups(dataframes_walk2_low[[2]], sumabsdiffpercentage)
+distance_data_walk3_low_adp <- full_groups(dataframes_walk3_low[[2]], sumabsdiffpercentage)
+distance_data_walk4_low_adp <- full_groups(dataframes_walk4_low[[2]], sumabsdiffpercentage)
+distance_data_walk5_low_adp <- full_groups(dataframes_walk5_low[[2]], sumabsdiffpercentage)
+distance_data_H10_adp <- full_groups(dataframes_H10[[2]], sumabsdiffpercentage)
+distance_data_H11_adp <- full_groups(dataframes_H11[[2]], sumabsdiffpercentage)
+distance_data_H12_adp <- full_groups(dataframes_H12[[2]], sumabsdiffpercentage)
+distance_data_H13_adp <- full_groups(dataframes_H13[[2]], sumabsdiffpercentage)
+distance_data_H14_adp <- full_groups(dataframes_H14[[2]], sumabsdiffpercentage)
+
+distance_data_walk1_cos <- full_groups(dataframes_walk1[[2]], cosine_similarity)
+distance_data_walk2_cos <- full_groups(dataframes_walk2[[2]], cosine_similarity)
+distance_data_walk3_cos <- full_groups(dataframes_walk3[[2]], cosine_similarity)
+distance_data_walk4_cos <- full_groups(dataframes_walk4[[2]], cosine_similarity)
+distance_data_walk5_cos <- full_groups(dataframes_walk5[[2]], cosine_similarity)
+distance_data_walk6_cos <- full_groups(dataframes_walk6[[2]], cosine_similarity)
+distance_data_walk7_cos <- full_groups(dataframes_walk7[[2]], cosine_similarity)
+distance_data_walk8_cos <- full_groups(dataframes_walk8[[2]], cosine_similarity)
+distance_data_walk9_cos <- full_groups(dataframes_walk9[[2]], cosine_similarity)
+distance_data_walk10_cos <- full_groups(dataframes_walk10[[2]], cosine_similarity)
+distance_data_walk2_low_cos <- full_groups(dataframes_walk2_low[[2]], cosine_similarity)
+distance_data_walk3_low_cos <- full_groups(dataframes_walk3_low[[2]], cosine_similarity)
+distance_data_walk4_low_cos <- full_groups(dataframes_walk4_low[[2]], cosine_similarity)
+distance_data_walk5_low_cos <- full_groups(dataframes_walk5_low[[2]], cosine_similarity)
+distance_data_H10_cos <- full_groups(dataframes_H10[[2]], cosine_similarity)
+distance_data_H11_cos <- full_groups(dataframes_H11[[2]], cosine_similarity)
+distance_data_H12_cos <- full_groups(dataframes_H12[[2]], cosine_similarity)
+distance_data_H13_cos <- full_groups(dataframes_H13[[2]], cosine_similarity)
+distance_data_H14_cos <- full_groups(dataframes_H14[[2]], cosine_similarity)
+
+distance_data_walk1_peak <- full_groups(dataframes_walk1[[2]], peak_height)
+distance_data_walk2_peak <- full_groups(dataframes_walk2[[2]], peak_height)
+distance_data_walk3_peak <- full_groups(dataframes_walk3[[2]], peak_height)
+distance_data_walk4_peak <- full_groups(dataframes_walk4[[2]], peak_height)
+distance_data_walk5_peak <- full_groups(dataframes_walk5[[2]], peak_height)
+distance_data_walk6_peak <- full_groups(dataframes_walk6[[2]], peak_height)
+distance_data_walk7_peak <- full_groups(dataframes_walk7[[2]], peak_height)
+distance_data_walk8_peak <- full_groups(dataframes_walk8[[2]], peak_height)
+distance_data_walk9_peak <- full_groups(dataframes_walk9[[2]], peak_height)
+distance_data_walk10_peak <- full_groups(dataframes_walk10[[2]], peak_height)
+distance_data_walk2_low_peak <- full_groups(dataframes_walk2_low[[2]], peak_height)
+distance_data_walk3_low_peak <- full_groups(dataframes_walk3_low[[2]], peak_height)
+distance_data_walk4_low_peak <- full_groups(dataframes_walk4_low[[2]], peak_height)
+distance_data_walk5_low_peak <- full_groups(dataframes_walk5_low[[2]], peak_height)
+
+distance_data_walk1_rsadsquare <- full_groups(dataframes_walk1[[2]], rescaled_sumsquared)
+distance_data_walk2_rsadsquare <- full_groups(dataframes_walk2[[2]], rescaled_sumsquared)
+distance_data_walk3_rsadsquare <- full_groups(dataframes_walk3[[2]], rescaled_sumsquared)
+distance_data_walk4_rsadsquare <- full_groups(dataframes_walk4[[2]], rescaled_sumsquared)
+distance_data_walk5_rsadsquare <- full_groups(dataframes_walk5[[2]], rescaled_sumsquared)
+distance_data_walk6_rsadsquare <- full_groups(dataframes_walk6[[2]], rescaled_sumsquared)
+distance_data_walk7_rsadsquare <- full_groups(dataframes_walk7[[2]], rescaled_sumsquared)
+distance_data_walk8_rsadsquare <- full_groups(dataframes_walk8[[2]], rescaled_sumsquared)
+distance_data_walk9_rsadsquare <- full_groups(dataframes_walk9[[2]], rescaled_sumsquared)
+distance_data_walk10_rsadsquare <- full_groups(dataframes_walk10[[2]], rescaled_sumsquared)
+distance_data_walk2_low_rsadsquare <- full_groups(dataframes_walk2_low[[2]], rescaled_sumsquared)
+distance_data_walk3_low_rsadsquare <- full_groups(dataframes_walk3_low[[2]], rescaled_sumsquared)
+distance_data_walk4_low_rsadsquare <- full_groups(dataframes_walk4_low[[2]], rescaled_sumsquared)
+distance_data_walk5_low_rsadsquare <- full_groups(dataframes_walk5_low[[2]], rescaled_sumsquared)
+
+distance_data_walk1_cor <- full_groups(dataframes_walk1[[2]], correlation_distance)
+distance_data_walk2_cor <- full_groups(dataframes_walk2[[2]], correlation_distance)
+distance_data_walk3_cor <- full_groups(dataframes_walk3[[2]], correlation_distance)
+distance_data_walk4_cor <- full_groups(dataframes_walk4[[2]], correlation_distance)
+distance_data_walk5_cor <- full_groups(dataframes_walk5[[2]], correlation_distance)
+distance_data_walk6_cor <- full_groups(dataframes_walk6[[2]], correlation_distance)
+distance_data_walk7_cor <- full_groups(dataframes_walk7[[2]], correlation_distance)
+distance_data_walk8_cor <- full_groups(dataframes_walk8[[2]], correlation_distance)
+distance_data_walk9_cor <- full_groups(dataframes_walk9[[2]], correlation_distance)
+distance_data_walk10_cor <- full_groups(dataframes_walk10[[2]], correlation_distance)
+distance_data_walk2_low_cor <- full_groups(dataframes_walk2_low[[2]], correlation_distance)
+distance_data_walk3_low_cor <- full_groups(dataframes_walk3_low[[2]], correlation_distance)
+distance_data_walk4_low_cor <- full_groups(dataframes_walk4_low[[2]], correlation_distance)
+distance_data_walk5_low_cor <- full_groups(dataframes_walk5_low[[2]], correlation_distance)
+distance_data_H10_cor <- full_groups(dataframes_H10[[2]], correlation_distance)
+distance_data_H11_cor <- full_groups(dataframes_H11[[2]], correlation_distance)
+distance_data_H12_cor <- full_groups(dataframes_H12[[2]], correlation_distance)
+distance_data_H13_cor <- full_groups(dataframes_H13[[2]], correlation_distance)
+distance_data_H14_cor <- full_groups(dataframes_H14[[2]], correlation_distance)
+
+distance_data_walk1_rsad <- full_groups(dataframes_walk1[[2]], rescaled_sumabsdiff)
+distance_data_walk2_rsad <- full_groups(dataframes_walk2[[2]], rescaled_sumabsdiff)
+distance_data_walk3_rsad <- full_groups(dataframes_walk3[[2]], rescaled_sumabsdiff)
+distance_data_walk4_rsad <- full_groups(dataframes_walk4[[2]], rescaled_sumabsdiff)
+distance_data_walk5_rsad <- full_groups(dataframes_walk5[[2]], rescaled_sumabsdiff)
+distance_data_walk6_rsad <- full_groups(dataframes_walk6[[2]], rescaled_sumabsdiff)
+distance_data_walk7_rsad <- full_groups(dataframes_walk7[[2]], rescaled_sumabsdiff)
+distance_data_walk8_rsad <- full_groups(dataframes_walk8[[2]], rescaled_sumabsdiff)
+distance_data_walk9_rsad <- full_groups(dataframes_walk9[[2]], rescaled_sumabsdiff)
+distance_data_walk10_rsad <- full_groups(dataframes_walk10[[2]], rescaled_sumabsdiff)
+```
+
+
+-----------------------------------
+
+Same thing as in actual code short version, but rescale the distance matrices to all have same mean, so that we really find points that are relatively far <- just a bad idea I guess.
+
+```{r}
+for(j in 1:10){
+  clustering <- c()
+  data <- get(paste0("short_distance_data_walk", j, "_cos"))
+  D <- data[[1]]
+  D <- D/mean(as.matrix(D))
+  density <- 1.2
+  points <- 20
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+  
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  
+  print(sum(clustering == 0)/length(clustering))
+}
+```
+
+## Approach 1: fixed parameters, try a few values
+We use normal DBSCAN with a few fixed parameter values. The distance function should support this and be independent of specifics of the individuals / rescaled in some sense.
+
+```{r}
+#Generate all pictures of the adp with same parameters
+D <- distance_data_H10_adp[[1]]
+D <- distance_data_walk1_adp[[1]]
+D <- distance_data_walk5_low_adp[[1]]
+D <- distance_data_walk5_low_cos[[1]]
+density <- 185
+points <- 3
+density <- 0.22
+points <- 3
+
+(noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)) #The 5 should maybe scale with total number of steps somewhat? Or just make it 3 and probably do not scale at all, any movement should have at least 3 steps practically. Or even make it 2 in this case. Just try a few
+
+clustering <- dbscan(as.dist(D), density, points)$clust
+
+#Visualise through MDS
+mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+coords <- as.data.frame(mds_result$points)
+colnames(coords) <- c("X", "Y", "Z")
+
+coords$cluster <- as.factor(clustering)
+
+plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(size = 4))
+```
+
+We now load the results we get into a table to visualise in different ways + compare with other data from the individuals
+
+```{r}
+numbers <- c(1:19)
+names <- c("W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9", "W10", "H10", "H11", "H12", "H13", "H14", "W2Low", "W3Low", "W4Low", "W5Low")
+df_walks <- data.frame(numbers = numbers, names = names)
+df_walks$age <- c(16, 11, 15.75, 12.17, 12.08, 10.33, 8.83, 9.92, 19, 10.5, 9.5, NA, NA, NA, NA, 11, 15.75, 12.17, 12.08) 
+df_walks$distance_approx <- c(570, 400, 180, 300, 220, 650, 450, 420, 440, 560, NA, NA, NA, NA, NA, 400, 180, 300, 220) #Approx until actually back
+#And here sth with walking quality
+  
+no_steps <- c()
+noise_frac_sgn <- c()
+noise_frac_adp <- c()
+noise_frac_cos <- c()
+noise_frac_cor <- c()
+for(j in 1:10){
+  no_steps <- append(no_steps, get(paste0("dataframes_walk", j))[[1]] %>% nrow())
+  D <- get(paste0("distance_data_walk", j))[[1]]
+  noise_frac_sgn <- append(noise_frac_sgn, sum(dbscan(as.dist(D), 30, 3)$clust == 0)/nrow(D))
+  D <- get(paste0("distance_data_walk", j, "_adp"))[[1]]
+  noise_frac_adp <- append(noise_frac_adp, sum(dbscan(as.dist(D), 180, 3)$clust == 0)/nrow(D))
+  # D <- get(paste0("distance_data_walk", j, "_cos"))[[1]]
+  # noise_frac_cos <- append(noise_frac_cos, sum(dbscan(as.dist(D), 180, 3)$clust == 0)/nrow(D))
+  D <- get(paste0("distance_data_walk", j, "_cor"))[[1]]
+  noise_frac_cos <- append(noise_frac_cos, sum(dbscan(as.dist(D), 0.22, 3)$clust == 0)/nrow(D))
+}
+no_steps <- append(no_steps, c(nrow(dataframes_H10[[1]]), 
+                   nrow(dataframes_H11[[1]]),
+                   nrow(dataframes_H12[[1]]),
+                   nrow(dataframes_H13[[1]]),
+                   nrow(dataframes_H14[[1]]),
+                   nrow(dataframes_walk2_low[[1]]),
+                   nrow(dataframes_walk3_low[[1]]),
+                   nrow(dataframes_walk4_low[[1]]),
+                   nrow(dataframes_walk5_low[[1]]))
+                   )
+D <- distance_data_H10[[1]]
+noise_frac_sgn <- append(noise_frac_sgn, sum(dbscan(as.dist(D), 30, 3)$clust == 0)/nrow(D))
+D <- distance_data_H10_adp[[1]]
+noise_frac_adp <- append(noise_frac_adp, sum(dbscan(as.dist(D), 180, 3)$clust == 0)/nrow(D))
+D <- distance_data_H10_cos[[1]]
+noise_frac_cos <- append(noise_frac_cos, sum(dbscan(as.dist(D), 0.22, 3)$clust == 0)/nrow(D))
+D <- distance_data_H11[[1]]
+noise_frac_sgn <- append(noise_frac_sgn, sum(dbscan(as.dist(D), 30, 3)$clust == 0)/nrow(D))
+D <- distance_data_H11_adp[[1]]
+noise_frac_adp <- append(noise_frac_adp, sum(dbscan(as.dist(D), 180, 3)$clust == 0)/nrow(D))
+D <- distance_data_H11_cos[[1]]
+noise_frac_cos <- append(noise_frac_cos, sum(dbscan(as.dist(D), 0.22, 3)$clust == 0)/nrow(D))
+D <- distance_data_H12[[1]]
+noise_frac_sgn <- append(noise_frac_sgn, sum(dbscan(as.dist(D), 30, 3)$clust == 0)/nrow(D))
+D <- distance_data_H12_adp[[1]]
+noise_frac_adp <- append(noise_frac_adp, sum(dbscan(as.dist(D), 180, 3)$clust == 0)/nrow(D))
+D <- distance_data_H12_cos[[1]]
+noise_frac_cos <- append(noise_frac_cos, sum(dbscan(as.dist(D), 0.22, 3)$clust == 0)/nrow(D))
+D <- distance_data_H13[[1]]
+noise_frac_sgn <- append(noise_frac_sgn, sum(dbscan(as.dist(D), 30, 3)$clust == 0)/nrow(D))
+D <- distance_data_H13_adp[[1]]
+noise_frac_adp <- append(noise_frac_adp, sum(dbscan(as.dist(D), 180, 3)$clust == 0)/nrow(D))
+D <- distance_data_H13_cos[[1]]
+noise_frac_cos <- append(noise_frac_cos, sum(dbscan(as.dist(D), 0.22, 3)$clust == 0)/nrow(D))
+D <- distance_data_H14[[1]]
+noise_frac_sgn <- append(noise_frac_sgn, sum(dbscan(as.dist(D), 30, 3)$clust == 0)/nrow(D))
+D <- distance_data_H14_adp[[1]]
+noise_frac_adp <- append(noise_frac_adp, sum(dbscan(as.dist(D), 180, 3)$clust == 0)/nrow(D))
+D <- distance_data_H14_cos[[1]]
+noise_frac_cos <- append(noise_frac_cos, sum(dbscan(as.dist(D), 0.22, 3)$clust == 0)/nrow(D))
+D <- distance_data_walk2_low[[1]]
+noise_frac_sgn <- append(noise_frac_sgn, sum(dbscan(as.dist(D), 30, 3)$clust == 0)/nrow(D))
+D <- distance_data_walk2_low_adp[[1]]
+noise_frac_adp <- append(noise_frac_adp, sum(dbscan(as.dist(D), 180, 3)$clust == 0)/nrow(D))
+D <- distance_data_walk2_low_cos[[1]]
+noise_frac_cos <- append(noise_frac_cos, sum(dbscan(as.dist(D), 0.22, 3)$clust == 0)/nrow(D))
+D <- distance_data_walk3_low[[1]]
+noise_frac_sgn <- append(noise_frac_sgn, sum(dbscan(as.dist(D), 30, 3)$clust == 0)/nrow(D))
+D <- distance_data_walk3_low_adp[[1]]
+noise_frac_adp <- append(noise_frac_adp, sum(dbscan(as.dist(D), 180, 3)$clust == 0)/nrow(D))
+D <- distance_data_walk3_low_cos[[1]]
+noise_frac_cos <- append(noise_frac_cos, sum(dbscan(as.dist(D), 0.22, 3)$clust == 0)/nrow(D))
+D <- distance_data_walk4_low[[1]]
+noise_frac_sgn <- append(noise_frac_sgn, sum(dbscan(as.dist(D), 30, 3)$clust == 0)/nrow(D))
+D <- distance_data_walk4_low_adp[[1]]
+noise_frac_adp <- append(noise_frac_adp, sum(dbscan(as.dist(D), 180, 3)$clust == 0)/nrow(D))
+D <- distance_data_walk4_low_cos[[1]]
+noise_frac_cos <- append(noise_frac_cos, sum(dbscan(as.dist(D), 0.22, 3)$clust == 0)/nrow(D))
+D <- distance_data_walk5_low[[1]]
+noise_frac_sgn <- append(noise_frac_sgn, sum(dbscan(as.dist(D), 30, 3)$clust == 0)/nrow(D))
+D <- distance_data_walk5_low_adp[[1]]
+noise_frac_adp <- append(noise_frac_adp, sum(dbscan(as.dist(D), 180, 3)$clust == 0)/nrow(D))
+D <- distance_data_walk5_low_cos[[1]]
+noise_frac_cos <- append(noise_frac_cos, sum(dbscan(as.dist(D), 0.22, 3)$clust == 0)/nrow(D))
+
+df_walks$no_steps <- no_steps
+df_walks$noise_frac_sgn <- noise_frac_sgn
+df_walks$noise_frac_adp <- noise_frac_adp
+df_walks$noise_frac_cos <- noise_frac_cos
+
+df_walks %>% view()
+```
+
+## Approach 2: multidimensional scaling + persistable
+We use the most persistent parameters to get clusters for DBSCAN and take the corresponding noise size.
+
+```{r}
+
+```
+
+... and add this to the table ...
+
+
+# Below is all trying things out
+
+## Investigation into which steps represent whole groups
+
+```{r}
+representative_list <- c()
+group_fraction <- seq(0.02, 1, 0.02)
+
+for(fraction in group_fraction){
+  val_list <- c()
+  for(j in 1:nrow(distance_data[[1]])){
+    val <- quantile(unlist(distance_data[[1]][j,]), fraction)
+    val_list <- append(val_list, val)
+  }
+  representative_list <- append(representative_list, which.min(val_list))
+}
+plot(representative_list, type = 'l')
+
+```
+
+## More classical clustering approach 1 - first is hierarchical clustering
+
+```{r}
+hc <- hclust(as.dist(distance_data[[1]]), method = "average")
+plot(hc, labels = FALSE, hang = -1, main = "Hierarchical Clustering Dendrogram")
+
+clusters <- cutree(hc, k = 5)
+```
+
+## Classical 2 - k-medoids (PAM)
+
+```{r}
+library(cluster)
+pam_result <- pam(as.dist(distance_data[[1]]), k = 5)
+clusters <- pam_result$clustering
+```
+
+## Classical 3 - classical multidimensional scaling // visualisation of all methods
+```{r}
+mds_result <- cmdscale(as.dist(distance_data[[1]]), k = 3, eig = T)
+#What does the k = 3 do in cmdscale: best fitting 3-dimensional representation of the steps!
+coords <- as.data.frame(mds_result$points)
+colnames(coords) <- c("X", "Y", "Z")
+
+library(plotly)
+
+coords$cluster <- as.factor(clusters)
+
+plot_ly(coords, x = ~X, y = ~Y, z = ~Z, color = ~cluster,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(size = 4)) %>%
+  layout(title = '3D MDS with Clusters')
+
+# plot_ly(coords, x = ~X, y = ~Y, z = ~Z,
+#         type = 'scatter3d', mode = 'markers',
+#         marker = list(size = 3, color = 'blue')) %>%
+#   layout(title = '3D MDS Projection',
+#          scene = list(xaxis = list(title = 'X'),
+#                       yaxis = list(title = 'Y'),
+#                       zaxis = list(title = 'Z')))
+```
+
+## Classical 4 - clustering using DBSCAN
+
+```{r}
+D <- distance_data[[1]]
+coords <- cmdscale(as.dist(D), k = 178, eig = T)$points
+
+sum((as.matrix(dist(coords)) - D)^2) / sum(D^2)
+
+strain <- sum((dist(coords) - as.dist(D))^2) / sum(D^2)
+
+dbscan(as.dist(D), 90, 5)
+```
+
+Own ``Persistable variant'' in R (but no homology...):
+
+```{r}
+D <- short_distance_data_walk1_redi[[1]]
+
+epsrange <- seq(0, max(D), max(D)/50)
+stepfraction <- seq(0, 0.2, 0.01)
+component_counter <- data.frame(matrix(nrow = length(epsrange), ncol = length(stepfraction)))
+noise_size_counter <- data.frame(matrix(nrow = length(epsrange), ncol = length(stepfraction)))
+
+for(i in 1:length(epsrange)){
+  for(j in 1:length(stepfraction)){
+    db_result <- dbscan(as.dist(D), epsrange[i], floor(nrow(D)*stepfraction[j]))
+    component_counter[i,j] <- length(unique(db_result$cluster))
+    noise_size_counter[i,j] <- sum(db_result$cluster == 0)
+  }
+}
+
+component_long <- as.data.frame(as.table(as.matrix(component_counter)))
+
+noise_long <- as.data.frame(as.table(as.matrix(noise_size_counter + 1)))
+
+ggplot(component_long, aes(x = Var1, y = Var2, fill = Freq)) +
+  geom_tile() +
+  scale_fill_gradient(
+    trans = "log10",
+    low = "white",
+    high = "black"
+  ) +
+  theme_minimal() +
+  coord_fixed() +
+  labs(x = "MinPnts", y = "distance scale (epsilon)", fill = "No. of clusters", title = "First walking test - absolute distance dissimilarities") +
+  theme(
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.x = element_line(color = "black"),
+    axis.ticks.y = element_line(color = "black"),
+    axis.line = element_line(color = "black")
+  )
+```
+
+```{r}
+db <- dbscan(coords, eps = 100, minPts = 5)
+hdb <- hdbscan(coords, minPts = 3)
+library(plotly)
+coords3d <- as.data.frame(cmdscale(as.dist(distance_data[[1]]), k = 3))
+coords3d$cluster <- as.factor(hdb$cluster)
+
+plot_ly(coords3d, x = ~V1, y = ~V2, z = ~V3, color = ~cluster,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(size = 4)) %>%
+  layout(title = '3D MDS with Clusters')
+```
+
+### Figures from this that are to be put into the thesis
+
+```{r}
+D <- short_distance_data_walk1_redi[[1]]
+D <- as.dist(D)
+
+fit <- smacofSym(D, ndim = 2)
+
+coords <- as.data.frame(fit$conf)
+colnames(coords) <- c("Dim1", "Dim2")
+
+plot <- ggplot(coords, aes(x = Dim1, y = Dim2)) +
+  geom_point(color = "#1f77b4", size = 2) +
+  labs(x = "Dimension 1", y = "Dimension 2") +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+ggsave("2D.png", plot, width = 10, height = 4, dpi = 300)
+```
+
+```{r}
+D <- short_distance_data_walk1_redi[[1]]
+D <- as.dist(D)
+fit <- smacofSym(D, ndim = 3)
+
+coords <- as.data.frame(fit$conf)
+colnames(coords) <- c("Dim1", "Dim2", "Dim3")
+
+plot_ly(coords, x = ~Dim1, y = ~Dim2, z = ~Dim3,
+        type = 'scatter3d', mode = 'markers',
+        marker = list(color = "#1f77b4", size = 3)) %>%
+  layout(scene = list(xaxis = list(title = 'Dimension 1'),
+                      yaxis = list(title = 'Dimension 2'),
+                      zaxis = list(title = 'Dimension 3')))
+```
+
+```{r}
+D <- short_distance_data_walk1_redi[[1]]
+D <- as.dist(D)
+
+pam_fit <- pam(D, k = 4, diss = TRUE)
+cluster_labels <- pam_fit$clustering
+
+Dmat <- as.matrix(D)
+
+dist_to_medoid <- sapply(1:nrow(Dmat), function(i) {
+  medoid_id <- pam_fit$medoids[cluster_labels[i]]
+  Dmat[i, medoid_id]
+})
+
+n <- length(dist_to_medoid)
+cutoff <- quantile(dist_to_medoid, 0.9)
+is_outlier <- dist_to_medoid > cutoff
+
+fit <- smacofSym(D, ndim = 2)
+coords <- as.data.frame(fit$conf)
+colnames(coords) <- c("Dim1", "Dim2")
+
+coords$Cluster <- factor(cluster_labels)
+coords$Outlier <- is_outlier
+coords$Color <- ifelse(coords$Outlier, "Outlier", as.character(coords$Cluster))
+coords$IsMedoid <- rownames(coords) %in% pam_fit$medoids
+coords$PointType <- ifelse(coords$IsMedoid, "Medoid", "Non-medoid")
+coords$ClusterLabel <- ifelse(coords$Outlier, "Outlier", as.character(coords$Cluster))
+
+
+color_map <- c(
+  "1" = "#56B4E9",
+  "2" = "#D62728",
+  "3" = "#FFCC33",
+  "4" = "#009E73",
+  "Outlier" = "grey"
+)
+
+cluster_labels_named <- c(
+  "1" = "Cluster 1",
+  "2" = "Cluster 2",
+  "3" = "Cluster 3",
+  "4" = "Cluster 4",
+  "Outlier" = "Outliers"
+)
+
+plot <- ggplot(coords, aes(x = Dim1, y = Dim2)) +
+  geom_point(aes(color = ClusterLabel, shape = PointType, size = PointType)) +
+  scale_color_manual(values = color_map, labels = cluster_labels_named, name = "Cluster") +
+  scale_shape_manual(values = c("Non-medoid" = 16, "Medoid" = 17), name = "Point type") +
+  scale_size_manual(values = c("Non-medoid" = 2, "Medoid" = 4), guide = "legend", name = "Point Type") +
+  labs(x = "Dimension 1", y = "Dimension 2") +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 14),
+    legend.text = element_text(size = 14),
+    legend.title = element_text(size = 14)
+  )
+
+ggsave("medoids_2D.png", plot, width = 10, height = 4, dpi = 300)
+```
+
+```{r}
+D <- as.dist(short_distance_data_walk1_redi[[1]])
+
+pam_fit <- pam(D, k = 4, diss = TRUE)
+cluster_labels <- pam_fit$clustering
+Dmat <- as.matrix(D)
+dist_to_medoid <- sapply(1:nrow(Dmat), function(i) {
+  medoid_id <- pam_fit$medoids[cluster_labels[i]]
+  Dmat[i, medoid_id]
+})
+cutoff <- quantile(dist_to_medoid, 0.9)
+is_outlier <- dist_to_medoid > cutoff
+
+fit3d <- smacofSym(D, ndim = 3)
+coords3d <- as.data.frame(fit3d$conf)
+colnames(coords3d) <- c("Dim1", "Dim2", "Dim3")
+
+coords3d$Cluster <- factor(cluster_labels)
+coords3d$IsMedoid <- rownames(coords3d) %in% pam_fit$medoids
+coords3d$Outlier <- is_outlier
+coords3d$Group <- ifelse(coords3d$Outlier, "Outlier", as.character(coords3d$Cluster))
+
+color_map <- c(
+  "1" = "#56B4E9",
+  "2" = "#D62728",
+  "3" = "#FFCC33",
+  "4" = "#009E73",
+  "Outlier" = "grey"
+)
+
+group_labels_named <- c(
+  "1" = "Cluster 1",
+  "2" = "Cluster 2",
+  "3" = "Cluster 3",
+  "4" = "Cluster 4",
+  "Outlier" = "Outliers"
+)
+
+plot <- plot_ly()
+
+for (grp in unique(coords3d$Group)) {
+  group_data <- coords3d %>% filter(Group == grp)
+  
+  non_medoid_data <- group_data %>% filter(!IsMedoid)
+  if (nrow(non_medoid_data) > 0) {
+    plot <- plot %>% add_markers(
+      data = non_medoid_data,
+      x = ~Dim1, y = ~Dim2, z = ~Dim3,
+      marker = list(size = 4, symbol = "circle"),
+      color = I(color_map[grp]),
+      name = group_labels_named[grp],
+      showlegend = TRUE
+    )
+  }
+  
+  medoid_data <- group_data %>% filter(IsMedoid)
+  if (nrow(medoid_data) > 0) {
+    plot <- plot %>% add_markers(
+      data = medoid_data,
+      x = ~Dim1, y = ~Dim2, z = ~Dim3,
+      marker = list(size = 8, symbol = "diamond"),
+      color = I(color_map[grp]),
+      name = paste(group_labels_named[grp], "(Medoid)"),
+      showlegend = TRUE
+    )
+  }
+}
+
+plot %>% layout(
+  legend = list(title = list(text = "<b>Cluster / Type</b>")),
+  scene = list(
+    xaxis = list(title = "Dimension 1"),
+    yaxis = list(title = "Dimension 2"),
+    zaxis = list(title = "Dimension 3")
+  )
+)
+
+```

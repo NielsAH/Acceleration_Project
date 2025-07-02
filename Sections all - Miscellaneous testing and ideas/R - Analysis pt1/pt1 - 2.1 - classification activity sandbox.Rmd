@@ -1,0 +1,469 @@
+### Importing libraries
+
+```{r, message=F, warning=F}
+library(tidyverse)
+```
+
+We now use the dataframe from cleaning, importing etc. to make a partition into the different active periods, and inactivity. If necessary, the active periods can be split up further at a later stadium. 
+
+First attempt to make the partition: consecutive periods where moving average is above threshold are activity. Then trim _(or expand! Add later)_ as to only have periods that really are active. Trim from outside -> values that are too low are excluded, until we get one above threshold. Can also trim from inside: go from within, and only include values high enough.
+
+```{r}
+#ma_left
+#ma_right
+``` 
+
+```{r}
+#n_ma is over how many values the moving average is taken in col_ma. Standard: 181
+activity_partition_to_df <- function(df, col_ma, n_ma, col_val, threshold)
+{
+  df[["activity_partition"]] <- 0
+  
+  partition_index <- 1
+  in_partition <- FALSE
+  
+  for (i in 1:nrow(df)) {
+    if(!is.na(df[i, col_ma]) && df[i, col_ma] > threshold) {
+      if(!in_partition) #Check if should be added to partition, or if we create a new element of the partition
+        {
+        in_partition <- TRUE
+        start_index <- i
+      }
+    }
+     else if (in_partition == TRUE){
+        in_partition <- FALSE
+        end_index <- i - 1
+        
+        #We only keep this element of the partition if it is long enough
+        if(end_index - start_index + 1 >= n_ma)
+          {
+          df$activity_partition[start_index:end_index] <- partition_index
+          partition_index <- partition_index + 1
+        }
+    }
+  }
+  
+  #We need to include the last partition if we are still in an active period
+  if (in_partition && (nrow(df) - start_index + 1) >= n_ma){
+    df$activity_partition[start_index:nrow(df)] <- partition_index
+  }
+  return(df)
+}
+
+#col_part is the column number of activity_partition
+trim_activity_partition <- function(df, n_ma, col_val, col_part, threshold){
+  n_skip = (n_ma-1)/2
+  
+  for (part_id in unique(df[[col_part]][df[[col_part]] != 0])) {
+    active_period <- df %>% filter(df[[col_part]] == part_id)
+    part_mean <- mean(active_period[[col_val]][(n_skip):(nrow(active_period) - n_skip)])
+    #We have a problem specifically with a situation as in period 141: a very short period where the middle of the activity is actually not that active, but the parts on the outside are. Should rarely occur
+    
+    #Important to document computation below!
+    
+    #The fraction of observations we need in our filter is threshold/part_mean, roughly.
+    #Could later be improved by taking the mean of next so many observations on both sides, instead of mean of whole active period
+    if(threshold/part_mean < 0.5){
+      
+      n_trim = ceiling(n_skip - (2*n_skip*(threshold/part_mean)))
+      indices <- which(df[[col_part]] == part_id)
+      df[[col_part]][indices][1:n_trim] <- rep(0, n_trim)
+      df[[col_part]][indices][(nrow(active_period) - n_trim + 1):(nrow(active_period))] <- rep(0, n_trim) 
+    }
+    #This case more difficult, because theoretically could be that active periods are merged? For now ignore
+    else if(threshold/part_mean > 0.5){
+
+      
+      n_include = ceiling(2*n_skip*(threshold/part_mean) - n_skip)
+      indices <- which(df[[col_part]] == part_id)
+      
+      #Make sure we have no problem with edge cases
+      if(min(indices) - n_include >= 1 & max(indices) + n_include <= nrow(df)){
+        df[[col_part]][indices - n_include][1:n_include] <- rep(part_id, n_include)
+        df[[col_part]][(max(indices)+1):(max(indices)+n_include)] <- rep(part_id, n_include)
+        
+      } else{
+        print("Problem on the boundaries of df when trying to n_include")
+        }
+    }
+  }
+  return(df)
+}
+
+
+#WIP: getting a mean from both sides is nice, but can lead to all kinds of issues if not very careful. Can lead to mean that is incredibly small in rare cases -> even smaller than the threshold, whereas it should always be larger
+
+trim_activity_partition_2 <- function(df, n_ma, col_val, col_part, threshold){
+  n_skip = (n_ma-1)/2
+  
+  for (part_id in unique(df[[col_part]][df[[col_part]] != 0])) {
+    active_period <- df %>% filter(df[[col_part]] == part_id)
+    #Minimum may be needed if too short otherwise
+    #Fraction should be based on mean etc. For now we just take half, but it is quite arbitrary to consider n_skip/2 values that may still influence, and n_skip/2 values not that could in theory influence
+    part_mean_left <- mean(active_period[[col_val]][(0.5*ceiling(n_skip)):(min(ceiling(1.5*n_skip), nrow(active_period) - floor(0.5*n_skip)))])
+    part_mean_right <- mean(active_period[[col_val]][max(n_skip, nrow(active_period) - floor(1.5*n_skip)) : (nrow(active_period) - floor(0.5*n_skip))])
+    
+    indices <- which(df[[col_part]] == part_id)
+    
+    #Now separately for left and right
+    if(threshold/part_mean_left < 0.5){
+      
+      n_trim = ceiling(n_skip - (2*n_skip*(threshold/part_mean_left)))
+      
+      df[[col_part]][indices][1:n_trim] <- rep(0, n_trim)
+    }
+    #This case more difficult, because theoretically could be that active periods are merged? For now ignore
+    else if(threshold/part_mean_left > 0.5){
+      
+      n_include = ceiling(2*n_skip*(threshold/part_mean_left) - n_skip)
+      
+      #Make sure we have no problem with edge cases
+      if(min(indices) - n_include >= 1){
+        
+        df[[col_part]][indices - n_include][1:n_include] <- rep(part_id, n_include)
+        
+      } else{
+        print("Problem on the boundaries of df when trying to n_include on left.")
+        }
+    }
+    
+    if(threshold/part_mean_right < 0.5){
+      
+      n_trim = ceiling(n_skip - (2*n_skip*(threshold/part_mean_right)))
+    
+      
+      df[[col_part]][indices][(nrow(active_period) - n_trim + 1):(nrow(active_period))] <- rep(0, n_trim) 
+    }
+    #This case more difficult, because theoretically could be that active periods are merged? For now ignore
+    else if(threshold/part_mean_right > 0.5){
+
+      
+      n_include = ceiling(2*n_skip*(threshold/part_mean_right) - n_skip)
+
+      #Make sure we have no problem with edge cases
+      if(max(indices) + n_include <= nrow(df)){
+
+        df[[col_part]][(max(indices)+1):(max(indices)+n_include)] <- rep(part_id, n_include)
+        
+      } else{
+        print("Problem on the boundaries of df when trying to n_include on right")
+        }
+    }
+  }
+  return(df)
+}
+
+#Does not depend on threshold!
+trim_activity_partition_3 <- function(df, n_ma, col_val, col_part, threshold){
+  n_skip = (n_ma-1)/2
+  
+  print(unique(df[[col_part]][df[[col_part]] != 0]))
+  
+  for (part_id in unique(df[[col_part]][df[[col_part]] != 0])) {
+    
+    print(part_id)
+    
+    indices <- which(df[[col_part]] == part_id)
+    start <- min(indices)
+    stop <- max(indices)
+    
+    if((start - 3*n_skip) >= 1 & (start - 1 + 3*n_skip) <= nrow(df)){ #Made 3* n_skip as the first and last of the moving average column are NA already
+      ma_left <- ma_left(df[(start - 2*n_skip):(start + n_skip - 1), col_val], n = (n_skip + 0)) #On the left, we do not want to include the value itself, but the ma function does so, so we need to account for this by taking +0 instead
+      ma_left <- ma_left[!is.na(ma_left)] #Removes the first n_skip values that were just needed for the computation of the relevant values anyway
+      
+      ma_right <- ma_right(df[(start - n_skip):(start + 2*n_skip), col_val], n = (n_skip + 1)) 
+      ma_right <- ma_right[!is.na(ma_right)]
+      
+      new_start <- start - n_skip - 1 + which.min(ma_left - ma_right)
+    } else{print("Check manually")}
+    
+    if((stop + 3*n_skip) <= nrow(df) & (stop + 1 - 3*n_skip) >= 1){
+      ma_left <- ma_left(df[(stop - 2*n_skip):(stop + n_skip), col_val], n = (n_skip + 1))
+      ma_left <- ma_left[!is.na(ma_left)]
+      
+      ma_right <- ma_right(df[(stop + 1 - n_skip):(stop + 2*n_skip), col_val], n = (n_skip + 0)) 
+      ma_right <- ma_right[!is.na(ma_right)]
+      
+      new_stop <- stop - n_skip - 1 + which.max(ma_left - ma_right) #Changed stop+1 to stop. With stop+1 it would be start of inactive period
+    } else{print("Check manually")}
+    
+    df[indices, col_part] <- 0
+    df[new_start:new_stop, col_part] <- part_id 
+  }
+  return(df)
+}
+
+trim_activity_partition_4 <- function(df, n_ma, col_val, col_part, threshold){
+  n_skip = (n_ma-1)/2
+  
+  print(unique(df[[col_part]][df[[col_part]] != 0]))
+  
+  for (part_id in unique(df[[col_part]][df[[col_part]] != 0])) {
+    
+    print(part_id)
+    
+    indices <- which(df[[col_part]] == part_id)
+    start <- min(indices)
+    stop <- max(indices)
+    
+    if((start - 3*n_skip) >= 1 & (start - 1 + 3*n_skip) <= nrow(df)){ #Made 3* n_skip as the first and last of the moving average column are NA already
+      ma_left <- ma_left(df[(start - 2*n_skip):(start + n_skip - 1), col_val], n = (n_skip + 0)) #On the left, we do not want to include the value itself, but the ma function does so, so we need to account for this by taking +0 instead
+      ma_left <- ma_left[!is.na(ma_left)] #Removes the first n_skip values that were just needed for the computation of the relevant values anyway
+      
+      ma_right <- ma_right(df[(start - n_skip):(start + 2*n_skip), col_val], n = (n_skip + 1)) 
+      ma_right <- ma_right[!is.na(ma_right)]
+      
+      new_start <- start - n_skip - 1 + which.min(ma_left/ma_right)
+    } else{print("Check manually")}
+    
+    if((stop + 3*n_skip) <= nrow(df) & (stop + 1 - 3*n_skip) >= 1){
+      ma_left <- ma_left(df[(stop - 2*n_skip):(stop + n_skip), col_val], n = (n_skip + 1))
+      ma_left <- ma_left[!is.na(ma_left)]
+      
+      ma_right <- ma_right(df[(stop + 1 - n_skip):(stop + 2*n_skip), col_val], n = (n_skip + 0)) 
+      ma_right <- ma_right[!is.na(ma_right)]
+      
+      new_stop <- stop - n_skip - 1 + which.max(ma_left/ma_right) #Changed stop+1 to stop. With stop+1 it would be start of inactive period
+    } else{print("Check manually")}
+    
+    df[indices, col_part] <- 0
+    df[new_start:new_stop, col_part] <- part_id 
+  }
+  return(df)
+}
+```
+
+_We need one more function to check if there's now active periods that need to be merged._
+
+```{r}
+#One more function which checks if there's active periods that need to be merged! 
+#(alternative: keep separate, as two active periods are still detected. Overwriting is not that big a problem in general and will mostly be ignored)
+
+#Then need function to relabel. E.g. if 2 and 3 merged, then partition element 4 becomes 3, etc.
+```
+
+
+We try our new way of splitting up into active periods on a very limited period, namely 8:21 until 9:38 on October 16.
+
+```{r}
+start_time <- as.POSIXct("2024-10-12 10:10:00.000")
+end_time <- as.POSIXct("2024-10-12 11:45.000")
+temp <- df %>% filter(time >= start_time & time <= end_time)
+ggplot(temp, aes(x = time)) + geom_line(aes(y = vec_diff))
+ggplot(temp, aes(x = time)) + geom_line(aes(y = ma_diff_181))
+```
+
+```{r}
+temp_part <- activity_partition_to_df(temp, 14, 181, 13, 0.05)
+temp_part %>% ggplot(aes(x = time)) +
+  geom_line(aes(y = ifelse(activity_partition == 0, 0, 0.3)), colour = "red") +
+  geom_line(aes(y = ma_diff_181))
+
+unique(temp_part$activity_partition)
+
+start_time <- as.POSIXct("2024-10-12 10:15:00.000")
+end_time <- as.POSIXct("2024-10-12 10:16:30.000")
+
+temp_part %>% filter(start_time <= time & end_time > time) %>% ggplot(aes(x = time)) + 
+  geom_line(aes(y = ifelse(activity_partition == 0, 0, 3)), colour = "red") +
+  geom_line(aes(y = vec_diff))
+```
+
+```{r}
+temp_part_trim <- trim_activity_partition_3(temp_part, 181, 13, 17)
+
+temp_part_trim %>% ggplot(aes(x = time)) +
+  geom_line(aes(y = ifelse(activity_partition == 0, 0, 0.3)), colour = "red") +
+  geom_line(aes(y = ma_diff_181))
+
+unique(temp_part_trim$activity_partition)
+
+start_time <- as.POSIXct("2024-10-12 10:15:00.000")
+end_time <- as.POSIXct("2024-10-12 10:16:30.000")
+
+temp_part_trim %>% filter(start_time <= time & end_time > time) %>% ggplot(aes(x = time)) + 
+  geom_line(aes(y = ifelse(activity_partition == 0, 0, 3)), colour = "red") +
+  geom_line(aes(y = vec_diff))
+```
+
+
+
+### Below testing/old
+
+Now testing the new trimming technique. First test on temp_part, then make general function out of it.
+
+```{r}
+ma_left <- function(x, n = 91){stats::filter(x, rep(1/n, n), sides = 1)}
+ma_right <- function(x, n = 91){rev(stats::filter(rev(x), rep(1/n, n), sides = 1))}
+
+test_array <- c(rep(0, 200), rep(10, 200), rep(0, 200))
+test_df <- as.data.frame(test_array)
+test_df <- add_ma_to_df(test_df, "ma", 1, 181)
+
+test_df <- activity_partition_to_df(test_df, 2, 181, 1, 1.0)
+test_df <- trim_activity_partition_3(test_df, 181, 1, 3, 1.0)
+view(test_df)
+```
+
+
+Check if no peaks in e.g. middle of the night. _Later analysis of how much noise we see when using the accelerometer._
+
+```{r}
+start_time <- as.POSIXct("2024-10-11 23:00:00.000")
+end_time <- as.POSIXct("2024-10-12 09:00.000")
+temp_2 <- df %>% filter(time >= start_time & time <= end_time)
+
+temp_part_2 <- activity_partition_to_df(temp_2, 14, 181, 13, 0.06)
+temp_part_2 %>% ggplot(aes(x = time)) +
+  geom_line(aes(y = ifelse(activity_partition == 0, 0, 0.3)), colour = "red") +
+  geom_line(aes(y = vec_diff))
+
+start_time <- as.POSIXct("2024-10-14 08:25:00.000")
+end_time <- as.POSIXct("2024-10-14 08:50.000")
+
+temp_part_2 %>% filter(start_time <= time & end_time > time) %>% ggplot(aes(x = time)) + 
+  geom_line(aes(y = ifelse(activity_partition == 0, 0, 3)), colour = "red") +
+  geom_line(aes(y = vec_diff))
+```
+
+
+### Below is old code, used when trying initially with averaging over 1801
+
+Great example is 09:15 - 09:40 on 16 October. It captures the wait for the red light at the busy Karwei-intersection, which was timed to have taken 55 seconds. According to this way to capture activity: 9:22:54 - 9:23:50
+
+```{r}
+start_time <- as.POSIXct("2024-10-16 08:36:00.000")
+end_time <- as.POSIXct("2024-10-16 08:50.000")
+
+df_part_trim_2 %>% filter(start_time <= time & end_time > time) %>% ggplot(aes(x = time)) + 
+  geom_line(aes(y = ifelse(activity_partition == 0, 0, 0.3)), colour = "red") +
+  geom_line(aes(y = ma_diff_181))
+
+df_part_trim %>% filter(start_time <= time & end_time > time) %>% ggplot(aes(x = time)) + 
+  geom_line(aes(y = ifelse(activity_partition == 0, 0, 0.3)), colour = "red") +
+  geom_line(aes(y = ma_diff_181))
+
+df_part %>% filter(start_time <= time & end_time > time) %>% ggplot(aes(x = time)) + 
+  geom_line(aes(y = ifelse(activity_partition == 0, 0, 0.3)), colour = "red") +
+  geom_line(aes(y = ma_diff_181))
+
+df_part_trim_2 %>% filter(activity_partition == 141) %>% pull(vec_diff) %>% length() 
+df_part_trim %>% filter(activity_partition == 141) %>% pull(vec_diff) %>% length() 
+df_part %>% filter(activity_partition == 141) %>% pull(vec_diff) %>% length() 
+
+view(df_part_trim %>% filter(start_time <= time & end_time > time))
+```
+
+Something strange with e.g. period 141. Mean considered lower than expected which is why it includes instead of trims? Also in the fix, the activity_2, it doesn't seem to correspond to what we expect.
+
+```{r}
+df_part %>% filter(activity_partition == 141) %>% pull(vec_diff) %>% mean()
+
+df_part_temp <- df_part %>% filter(activity_partition == 141)
+dim(df_part_temp)
+df_part_temp_middle <- df_part_temp[901:(nrow(df_part_temp) - 900),]
+dim(df_part_temp_middle)
+mean(df_part_temp_middle$vec_diff)
+view(df_part_temp_middle)
+
+df_part_temp_middle %>% ggplot(aes(x = time)) + geom_line(aes(y = ma_diff_181)) 
+df_part_temp_left %>% ggplot(aes(x = time)) + geom_line(aes(y = ma_diff_181)) 
+mean(df_part_temp_middle$vec_diff)
+
+n_skip = 900
+df_part_temp[(n_skip + 1):(nrow(df_part_temp) - n_skip),] %>% pull(vec_diff) %>% mean()
+
+df_part_temp_left <- df_part_temp[901:1350,]
+
+df_part_temp_left <- df_part_temp_middle[1:450,]
+df_part_temp_left$vec_diff %>% mean()
+
+
+df_part_temp_right <- df_part_temp[(nrow(df_part_temp) - 1350) : (nrow(df_part_temp) - 900),]
+df_part_temp_right$vec_diff %>% mean()
+
+df_part_temp 
+view(df_part_temp)
+
+temp141 <- df[15846594:15848509,]
+temp141 %>% ggplot(aes(x = time)) + geom_line(aes(y = ma_diff_181))
+temp141$vec_diff %>% mean()
+n_skip = 900
+
+temp141$vec_diff[(n_skip):(min(2*n_skip, nrow(temp141) - n_skip))] %>% mean()
+temp141_left <- temp141[(n_skip):(min(2*n_skip, nrow(temp141) - n_skip)),]
+temp141_left %>% ggplot(aes(x = time)) + geom_line(aes(y = ma_diff_181))
+
+temp141$vec_diff[max(n_skip, nrow(temp141) - 2*n_skip) : (nrow(temp141) - n_skip)] %>% mean()
+temp141_right <- temp141[max(n_skip, nrow(temp141) - 2*n_skip) : (nrow(temp141) - n_skip),]
+temp141_right %>% ggplot(aes(x = time)) + geom_line(aes(y = ma_diff_181))
+
+temp141$vec_diff[450:(nrow(temp141) - 450)] %>% mean()
+
+```
+
+Investigation left mean very low in period 2:
+
+```{r}
+df_part %>% filter(activity_partition == 2) %>% ggplot(aes(x=time)) + geom_line(aes(y = vec_diff))
+df_part_2 <- df_part %>% filter(activity_partition == 2)
+df_part_2[450:1350,] %>% ggplot(aes(x=time)) + geom_line(aes(y = vec_diff))
+df_part_2[450:1350,13] %>% mean()
+2641
+```
+
+
+###Real/old sandbox below
+
+We take a simpler dataframe to test the function.
+
+```{r}
+start_time <- as.POSIXct("2024-10-10 08:15:00.000")
+end_time <- as.POSIXct("2024-10-10 09:00.000")
+temp <- df %>% filter(start_time <= time & end_time > time)
+
+temp %>% ggplot(aes(x = time, y = ma_diff_181)) + geom_line() + theme_minimal()
+view(temp)
+```
+
+
+```{r}
+temp2 <- activity_partition_to_df(temp, 14, 181, 13, 0.05)
+ggplot(temp2, aes(x = time)) + 
+  geom_line(aes(y = activity_partition)) + 
+  geom_line(aes(y = ma_diff_181))
+
+temp2 %>% filter(activity_partition == 5) %>% ggplot(aes(x = time, y = vec_diff)) + geom_line() 
+
+#temp2 %>% filter(activity_partition == 7) %>% pull(Y) %>% acf(, lag.max = 100)
+```
+
+We now try the same with a lower ma, and hopefully less noise
+
+```{r}
+temp3 <- activity_partition_to_df(temp, 15, 601, 13, 0.05)
+
+ggplot(temp3_trim, aes(x = time)) + 
+  geom_line(aes(y = activity_partition)) + 
+  geom_line(aes(y = ma_diff_181))
+
+temp3 %>% filter(activity_partition == 1) %>% ggplot(aes(x = time, y = vec_diff)) + geom_line() 
+
+temp3 %>% filter(activity_partition == 2) %>% nrow()
+
+temp3_trim <- trim_activity_partition(temp3, 601, 13, 17, 0.05)
+
+```
+
+```{r}
+temp4 <- activity_partition_to_df(temp, 16, 1801, 13, 0.075)
+
+ggplot(temp4, aes(x = time)) + 
+  geom_line(aes(y = activity_partition)) + 
+  geom_line(aes(y = ma_diff_1801))
+
+temp4_trim %>% filter(activity_partition == 1) %>% ggplot(aes(x = time, y = ma_diff_181)) + geom_line() 
+
+temp4_trim <- trim_activity_partition(temp4, 1801, 13, 17, 0.075)
+```
+

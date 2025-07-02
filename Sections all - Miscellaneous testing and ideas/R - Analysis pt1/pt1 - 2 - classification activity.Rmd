@@ -1,0 +1,162 @@
+### Importing libraries
+
+```{r, message=F, warning=F}
+library(tidyverse)
+```
+
+Functions we use (from the sandbox, which is where we alter them and replace them from):
+
+```{r}
+ma_left <- function(x, n = 91){stats::filter(x, rep(1/n, n), sides = 1)}
+ma_right <- function(x, n = 91){rev(stats::filter(rev(x), rep(1/n, n), sides = 1))}
+```
+
+```{r}
+
+activity_partition_to_df <- function(df, col_ma, n_ma, col_val, threshold)
+{
+  df[["activity_partition"]] <- 0
+  
+  partition_index <- 1
+  in_partition <- FALSE
+  
+  for (i in 1:nrow(df)) {
+    if(!is.na(df[i, col_ma]) && df[i, col_ma] > threshold) {
+      if(!in_partition) #Check if should be added to partition, or if we create a new element of the partition
+        {
+        in_partition <- TRUE
+        start_index <- i
+      }
+    }
+     else if (in_partition == TRUE){
+        in_partition <- FALSE
+        end_index <- i - 1
+        
+        #We only keep this element of the partition if it is long enough
+        if(end_index - start_index + 1 >= n_ma)
+          {
+          df$activity_partition[start_index:end_index] <- partition_index
+          partition_index <- partition_index + 1
+        }
+    }
+  }
+  
+  #We need to include the last partition if we are still in an active period
+  if (in_partition && (nrow(df) - start_index + 1) >= n_ma){
+    df$activity_partition[start_index:nrow(df)] <- partition_index
+  }
+  return(df)
+}
+
+```
+
+```{r}
+
+trim_activity_partition_3 <- function(df, n_ma, col_val, col_part, threshold){
+  n_skip = (n_ma-1)/2
+  
+  print(unique(df[[col_part]][df[[col_part]] != 0]))
+  
+  for (part_id in unique(df[[col_part]][df[[col_part]] != 0])) {
+    
+    print(part_id)
+    
+    indices <- which(df[[col_part]] == part_id)
+    start <- min(indices)
+    stop <- max(indices)
+    
+    if((start - 3*n_skip) >= 1 & (start - 1 + 3*n_skip) <= nrow(df)){ #Made 3* n_skip as the first and last of the moving average column are NA already
+      ma_left <- ma_left(df[(start - 2*n_skip):(start + n_skip - 1), col_val], n = (n_skip + 0)) #On the left, we do not want to include the value itself, but the ma function does so, so we need to account for this by taking +0 instead
+      ma_left <- ma_left[!is.na(ma_left)] #Removes the first n_skip values that were just needed for the computation of the relevant values anyway
+      
+      ma_right <- ma_right(df[(start - n_skip):(start + 2*n_skip), col_val], n = (n_skip + 1)) 
+      ma_right <- ma_right[!is.na(ma_right)]
+      
+      new_start <- start - n_skip - 1 + which.min(ma_left - ma_right)
+    } else{print("Check manually")}
+    
+    if((stop + 3*n_skip) <= nrow(df) & (stop + 1 - 3*n_skip) >= 1){
+      ma_left <- ma_left(df[(stop - 2*n_skip):(stop + n_skip), col_val], n = (n_skip + 1))
+      ma_left <- ma_left[!is.na(ma_left)]
+      
+      ma_right <- ma_right(df[(stop + 1 - n_skip):(stop + 2*n_skip), col_val], n = (n_skip + 0)) 
+      ma_right <- ma_right[!is.na(ma_right)]
+      
+      new_stop <- stop - n_skip - 1 + which.max(ma_left - ma_right)
+      #Note: if several, which.max takes first and that is fine to us. We do not exepct this to happen, and could decide arbitrarily if it does
+    } else{print("Check manually")}
+    
+    df[indices, col_part] <- 0
+    df[new_start:new_stop, col_part] <- part_id 
+  }
+  return(df)
+}
+
+trim_activity_partition_4 <- function(df, n_ma, col_val, col_part, threshold){
+  n_skip = (n_ma-1)/2
+  
+  print(unique(df[[col_part]][df[[col_part]] != 0]))
+  
+  for (part_id in unique(df[[col_part]][df[[col_part]] != 0])) {
+    
+    print(part_id)
+    
+    indices <- which(df[[col_part]] == part_id)
+    start <- min(indices)
+    stop <- max(indices)
+    
+    if((start - 3*n_skip) >= 1 & (start - 1 + 3*n_skip) <= nrow(df)){ #Made 3* n_skip as the first and last of the moving average column are NA already
+      ma_left <- ma_left(df[(start - 2*n_skip):(start + n_skip - 1), col_val], n = (n_skip + 0)) #On the left, we do not want to include the value itself, but the ma function does so, so we need to account for this by taking +0 instead
+      ma_left <- ma_left[!is.na(ma_left)] #Removes the first n_skip values that were just needed for the computation of the relevant values anyway
+      
+      ma_right <- ma_right(df[(start - n_skip):(start + 2*n_skip), col_val], n = (n_skip + 1)) 
+      ma_right <- ma_right[!is.na(ma_right)]
+      
+      new_start <- start - n_skip - 1 + which.min(ma_left/ma_right)
+    } else{print("Check manually")}
+    
+    if((stop + 3*n_skip) <= nrow(df) & (stop + 1 - 3*n_skip) >= 1){
+      ma_left <- ma_left(df[(stop - 2*n_skip):(stop + n_skip), col_val], n = (n_skip + 1))
+      ma_left <- ma_left[!is.na(ma_left)]
+      
+      ma_right <- ma_right(df[(stop + 1 - n_skip):(stop + 2*n_skip), col_val], n = (n_skip + 0)) 
+      ma_right <- ma_right[!is.na(ma_right)]
+      
+      new_stop <- stop - n_skip - 1 + which.max(ma_left/ma_right) #Changed stop+1 to stop. With stop+1 it would be start of inactive period
+    } else{print("Check manually")}
+    
+    df[indices, col_part] <- 0
+    df[new_start:new_stop, col_part] <- part_id 
+  }
+  return(df)
+}
+
+```
+
+See the 2 - sandbox file to see what functions need to be altered and added. 
+
+```{r}
+df_part <- activity_partition_to_df(df, 14, 181, 13, 0.075)
+
+unique(df_part$activity_partition)
+
+df_part_trim <- trim_activity_partition_3(df_part, 181, 13, 17)
+df_part_trim_alt <- trim_activity_partition_4(df_part, 181, 13, 17)
+```
+
+```{r}
+start_time <- as.POSIXct("2024-10-16 12:22:06.000")
+end_time <- as.POSIXct("2024-10-16 12:22:07.000")
+
+df_part %>% filter(start_time <= time & end_time > time) %>% ggplot(aes(x = time)) + 
+  geom_line(aes(y = ifelse(activity_partition == 0, 0, 0.5)), colour = "red") +
+  geom_line(aes(y = vec_diff))
+
+df_part_trim %>% filter(start_time <= time & end_time > time) %>% ggplot(aes(x = time)) + 
+  geom_line(aes(y = ifelse(activity_partition == 0, 0, 0.5)), colour = "red") +
+  geom_line(aes(y = vec_diff))
+
+df_part_trim_alt %>% filter(start_time <= time & end_time > time) %>% ggplot(aes(x = time)) + 
+  geom_line(aes(y = ifelse(activity_partition == 0, 0, 0.5)), colour = "red") +
+  geom_line(aes(y = vec_diff))
+```

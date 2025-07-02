@@ -1,0 +1,533 @@
+```{r, message=F, warning=F}
+#Data analysis
+library(tidyverse)
+library(latex2exp)
+library(patchwork)
+library(scales)
+library(RColorBrewer)
+
+#Working with the activity class and data files
+library(lubridate)
+library(read.gt3x)
+library(PhysicalActivity)
+
+#Solving equations
+library(nleqslv)
+library(pracma)
+library(latex2exp)
+
+#Reshaping / data manipulation
+library(reshape2)
+library(data.table)
+library(zeallot)
+
+##gganimate/creating animations
+library(gganimate)
+library(glue)
+library(shiny)
+library(av)
+library(magick)
+
+#Clustering
+library(dbscan)
+library(cluster)
+library(plotly)
+library(htmlwidgets)
+library(htmltools)
+library(smacof)
+```
+
+# Examples all with spasm data, later generalise for more data after getting approach
+
+## General: data
+
+```{r}
+#Purely analysis of what is on video (5 seconds on both sides added):
+start_time <- as.POSIXct("2025-04-15 11:34:52.099999")
+end_time <- as.POSIXct("2025-04-15 11:35:51.099999")
+df_spas_vid <- filter(Misc3, time > start_time & time < end_time)
+
+start_time <- as.POSIXct("2025-04-15 11:32:50.099999")
+end_time <- as.POSIXct("2025-04-15 11:36:10.099999")
+df_spas <- filter(Misc3, time > start_time & time < end_time)
+
+wdw_size <- 120
+ma_data <- 5 
+ma_energy <- 5 
+kernel_func <- ma_gauss 
+std_dev <- 1
+upright_thresh <- 0.75
+abs_acc_thresh <- 0.1 
+thresh_abs <- 0 
+thresh_rel <- 0.25 
+min_step_period <- 5
+max_step_period <- 40
+period_len <- 5 
+period_len_double <- 5
+period_thresh <- 0.14
+double_step_thresh <- 0.21
+thresh_direction <- 0.3
+
+data_spas <- fast_extraction_algorithm(df_spas, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+
+data_spas_vid <- fast_extraction_algorithm(df_spas_vid, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+
+ordata_spas <- Glue_and_classify(data_spas, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+ordata_spas_vid <- Glue_and_classify(data_spas_vid, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+
+```
+
+```{r}
+short_dataframes_spas <- full_steps(ordata_spas, 80, filter_none)
+short_dataframes_spas_vid <- full_steps(ordata_spas_vid, 80, filter_none)
+```
+
+```{r}
+short_distance_data_spas_sgn <- full_groups(short_dataframes_spas[[2]], sign_disagree)
+short_distance_data_spas_vid_sgn <- full_groups(short_dataframes_spas_vid[[2]], sign_disagree)
+
+short_distance_data_spas_cor <- full_groups(short_dataframes_spas[[2]], correlation_distance)
+short_distance_data_spas_vid_cor <- full_groups(short_dataframes_spas_vid[[2]], correlation_distance)
+
+short_distance_data_spas_cos <- full_groups(short_dataframes_spas[[2]], cosine_similarity)
+short_distance_data_spas_vid_cos <- full_groups(short_dataframes_spas_vid[[2]], cosine_similarity)
+
+short_distance_data_spas_sas <- full_groups(short_dataframes_spas[[2]], sumabsscaled)
+short_distance_data_spas_vid_sas <- full_groups(short_dataframes_spas_vid[[2]], sumabsscaled)
+
+short_distance_data_spas_prel <- full_groups(short_dataframes_spas[[2]], peak_height_rel)
+short_distance_data_spas_vid_prel <- full_groups(short_dataframes_spas_vid[[2]], peak_height_rel)
+
+short_distance_data_spas_inf <- full_groups(short_dataframes_spas[[2]], rescaled_inf_norm)
+short_distance_data_spas_vid_inf <- full_groups(short_dataframes_spas_vid[[2]], rescaled_inf_norm)
+
+short_distance_data_spas_resq <- full_groups(short_dataframes_spas[[2]], rescaled_sumsquared)
+short_distance_data_spas_vid_resq <- full_groups(short_dataframes_spas_vid[[2]], rescaled_sumsquared)
+
+short_distance_data_spas_redi <- full_groups(short_dataframes_spas[[2]], rescaled_sumabsdiff)
+short_distance_data_spas_vid_redi <- full_groups(short_dataframes_spas_vid[[2]], rescaled_sumabsdiff)
+
+short_distance_data_spas_sgn2 <- full_groups(short_dataframes_spas[[2]], sign_disagree_fac2)
+short_distance_data_spas_vid_sgn2 <- full_groups(short_dataframes_spas_vid[[2]], sign_disagree_fac2)
+```
+
+Visualisation stored in separate pdf files
+```{r}
+no_to_compare_half <- 30
+
+sgn <- sign_disagree
+cor <- correlation_distance
+cos <- cosine_similarity
+sas <- sumabsscaled
+prel <- peak_height_rel
+inf <- rescaled_inf_norm
+resq <- rescaled_sumsquared
+redi <- rescaled_sumabsdiff
+sgn2 <- sign_disagree_fac2
+
+densities <- c(2.14, 82, 21, 0.44, 0.45, 50, 67, 57, 1.41) 
+
+t <- 0
+
+for(measure in c("inf", "sas", "sgn", "cor", "cos", "sgn2", "resq", "redi", "prel")){
+  
+  t <- t + 1
+  
+  clustering <- c()
+  data <- get(paste0("short_distance_data_spas_", measure))
+  D <- data[[1]]
+  density <- densities[t]
+  points <- 10
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+    } else{
+      clustering[k] <- 0
+    }
+  }
+  
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  
+  print(sum(clustering == 0)/length(clustering))
+  assign(paste0(measure, "_val"), sum(clustering == 0)/length(clustering))
+}
+```
+
+### Now we move onto fractions for other individuals:
+
+```{r}
+names <- c("W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9", "W10")
+no_to_compare_half <- 30
+
+cor1_data <- c()
+cos1_data <- c()
+redi1_data <- c()
+resq1_data <- c()
+cor2_data <- c()
+cos2_data <- c()
+redi2_data <- c()
+resq2_data <- c()
+cor3_data <- c()
+cos3_data <- c()
+redi3_data <- c()
+resq3_data <- c()
+
+cor_data <- c()
+cos_data <- c()
+
+
+for(j in 1:10){
+  clustering <- c()
+  data <- get(paste0("short_distance_data_walk", j, "_cos"))
+  D <- data[[1]]
+  density <- 0.45
+  points <- 10
+  
+  #print((noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)))
+  # print(nrow(D))
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+  
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  
+  pt0 <- sum(clustering == 0)/length(clustering)
+  
+  parts <- split(clustering, cut(seq_along(clustering), 3, labels = FALSE))
+  pt1 <- sum(parts$`1` == 0)/length(parts$`1`)
+  pt2 <- sum(parts$`2` == 0)/length(parts$`2`)
+  pt3 <- sum(parts$`3` == 0)/length(parts$`3`)
+  
+  cos1_data <- append(cos1_data, pt1)
+  cos2_data <- append(cos2_data, pt2)
+  cos3_data <- append(cos3_data, pt3)
+  cos_data <- append(cos_data, pt0)
+  
+}
+
+for(j in 1:10){
+  clustering <- c()
+  data <- get(paste0("short_distance_data_walk", j, "_cor"))
+  D <- data[[1]]
+  density <- 0.44
+  points <- 10
+  
+  #print((noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)))
+  # print(nrow(D))
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+  
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  
+  pt0 <- sum(clustering == 0)/length(clustering)
+  
+  parts <- split(clustering, cut(seq_along(clustering), 3, labels = FALSE))
+  pt1 <- sum(parts$`1` == 0)/length(parts$`1`)
+  pt2 <- sum(parts$`2` == 0)/length(parts$`2`)
+  pt3 <- sum(parts$`3` == 0)/length(parts$`3`)
+  
+  cor_data <- append(cor_data, pt0)
+  
+  cor1_data <- append(cor1_data, pt1)
+  cor2_data <- append(cor2_data, pt2)
+  cor3_data <- append(cor3_data, pt3)
+}
+
+for(j in 1:10){
+  clustering <- c()
+  data <- get(paste0("short_distance_data_walk", j, "_redi"))
+  D <- data[[1]]
+  density <- 57
+  points <- 10
+  
+  #print((noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)))
+  # print(nrow(D))
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+  
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  
+  parts <- split(clustering, cut(seq_along(clustering), 3, labels = FALSE))
+  pt1 <- sum(parts$`1` == 0)/length(parts$`1`)
+  pt2 <- sum(parts$`2` == 0)/length(parts$`2`)
+  pt3 <- sum(parts$`3` == 0)/length(parts$`3`)
+  
+  redi1_data <- append(redi1_data, pt1)
+  redi2_data <- append(redi2_data, pt2)
+  redi3_data <- append(redi3_data, pt3)
+}
+
+for(j in 1:10){
+  clustering <- c()
+  data <- get(paste0("short_distance_data_walk", j, "_resq"))
+  D <- data[[1]]
+  density <- 67
+  points <- 10
+  
+  #print((noise_frac <- sum(dbscan(as.dist(D), density, points)$clust == 0)/nrow(D)))
+  # print(nrow(D))
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1 #Always close to itself
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+  } else{
+    clustering[k] <- 0
+  }
+  }
+  
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  
+  parts <- split(clustering, cut(seq_along(clustering), 3, labels = FALSE))
+  pt1 <- sum(parts$`1` == 0)/length(parts$`1`)
+  pt2 <- sum(parts$`2` == 0)/length(parts$`2`)
+  pt3 <- sum(parts$`3` == 0)/length(parts$`3`)
+  
+  resq1_data <- append(resq1_data, pt1)
+  resq2_data <- append(resq2_data, pt2)
+  resq3_data <- append(resq3_data, pt3)
+}
+```
+
+### Individual W6 harsher parameters
+
+```{r}
+start_time <- as.POSIXct("2025-01-20 10:31:25.000")
+end_time <- as.POSIXct("2025-01-20 10:37:40.000")
+df_walk1_harsh <- filter(Walk1, time > start_time & time < end_time)
+
+wdw_size <- 120
+ma_data <- 5 
+ma_energy <- 5 
+kernel_func <- ma_gauss 
+std_dev <- 1
+upright_thresh <- 0.75
+abs_acc_thresh <- 0.1 
+thresh_abs <- 0 
+thresh_rel <- 0.25 
+min_step_period <- 5
+max_step_period <- 40
+period_len <- 5 
+period_len_double <- 5
+period_thresh <- 0.35
+double_step_thresh <- 0.35
+thresh_direction <- 0.3
+
+data_walk1_harsh <- fast_extraction_algorithm(df_walk1_harsh, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+
+ordata_harsh <- Glue_and_classify(data_walk1_harsh, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+```
+
+```{r}
+short_dataframes_harsh <- full_steps(ordata_harsh, 80, filter_none)
+```
+
+```{r}
+short_distance_data_harsh_sgn <- full_groups(short_dataframes_harsh[[2]], sign_disagree)
+short_distance_data_harsh_cor <- full_groups(short_dataframes_harsh[[2]], correlation_distance)
+short_distance_data_harsh_cos <- full_groups(short_dataframes_harsh[[2]], cosine_similarity)
+short_distance_data_harsh_sas <- full_groups(short_dataframes_harsh[[2]], sumabsscaled)
+short_distance_data_harsh_prel <- full_groups(short_dataframes_harsh[[2]], peak_height_rel)
+short_distance_data_harsh_inf <- full_groups(short_dataframes_harsh[[2]], rescaled_inf_norm)
+short_distance_data_harsh_resq <- full_groups(short_dataframes_harsh[[2]], rescaled_sumsquared)
+short_distance_data_harsh_redi <- full_groups(short_dataframes_harsh[[2]], rescaled_sumabsdiff)
+short_distance_data_harsh_sgn2 <- full_groups(short_dataframes_harsh[[2]], sign_disagree_fac2)
+```
+
+Visualisation stored in separate pdf files
+```{r}
+no_to_compare_half <- 30
+
+sgn <- sign_disagree
+cor <- correlation_distance
+cos <- cosine_similarity
+sas <- sumabsscaled
+prel <- peak_height_rel
+inf <- rescaled_inf_norm
+resq <- rescaled_sumsquared
+redi <- rescaled_sumabsdiff
+sgn2 <- sign_disagree_fac2
+
+densities <- c(2.14, 82, 21, 0.44, 0.45, 50, 67, 57, 1.41) 
+
+t <- 0
+
+for(measure in c("inf", "sas", "sgn", "cor", "cos", "sgn2", "resq", "redi", "prel")){
+  
+  t <- t + 1
+  
+  clustering <- c()
+  data <- get(paste0("short_distance_data_harsh_", measure))
+  D <- data[[1]]
+  density <- densities[t]
+  points <- 10
+  
+  clustering <- numeric(nrow(D))
+  for(k in 1:nrow(D)){
+    if(k > nrow(D) - no_to_compare_half){
+      max_idx <- nrow(D)
+      min_idx <- nrow(D) - 2*no_to_compare_half
+    } else if(k < (no_to_compare_half + 1)){
+      max_idx <- no_to_compare_half * 2 + 1
+      min_idx <- 1
+    } else{
+      min_idx <- k - no_to_compare_half
+      max_idx <- k + no_to_compare_half
+    }
+  close_points <- 0
+  for(l in min_idx:max_idx){
+    if(D[k, l] < density){
+      close_points <- close_points + 1
+    }
+  }
+  if(close_points > points){
+    clustering[k] <- 1
+    } else{
+      clustering[k] <- 0
+    }
+  }
+  
+  mds_result <- cmdscale(as.dist(D), k = 3, eig = T)
+  
+  coords <- as.data.frame(mds_result$points)
+  colnames(coords) <- c("X", "Y", "Z")
+  
+  coords$cluster <- clustering
+  coords$cluster <- factor(coords$cluster, levels = c(0, 1), labels = c("Noise", "Clustered"))
+  
+  print(sum(clustering == 0)/length(clustering))
+  assign(paste0(measure, "_val"), sum(clustering == 0)/length(clustering))
+}
+```

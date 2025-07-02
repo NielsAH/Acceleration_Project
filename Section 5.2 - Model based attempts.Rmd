@@ -1,0 +1,98 @@
+```{r, message=F, warning=F}
+#Data analysis
+library(tidyverse)
+library(latex2exp)
+library(patchwork)
+library(scales)
+library(RColorBrewer)
+
+#Working with the activity class and data files
+library(lubridate)
+library(read.gt3x)
+library(PhysicalActivity)
+
+#Solving equations
+library(nleqslv)
+library(pracma)
+library(latex2exp)
+
+#Reshaping / data manipulation
+library(reshape2)
+library(data.table)
+library(zeallot)
+
+##gganimate/creating animations
+library(gganimate)
+library(glue)
+library(shiny)
+library(av)
+library(magick)
+
+#Clustering
+library(dbscan)
+library(cluster)
+library(plotly)
+library(htmlwidgets)
+library(htmltools)
+
+library(meanShiftR)
+```
+
+## Short_files analysis with k-shift
+
+```{r}
+D <- short_distance_data_walk3_cos[[1]]
+
+coords <- cmdscale(as.dist(D), k = 2)
+
+# Apply mean-shift clustering on the MDS coordinates
+# Bandwidth is estimated automatically
+clust_result <- meanShift(coords, bandwidth = c(0.25, 0.25))
+
+# Cluster assignments
+clusters <- clust_result$assignment
+
+
+df_plot <- data.frame(
+  Dim1 = coords[,1],
+  Dim2 = coords[,2],
+  Cluster = factor(clusters)
+)
+
+# Plot the clusters
+ggplot(df_plot, aes(x = Dim1, y = Dim2, color = Cluster)) +
+  geom_point(size = 3) +
+  theme_minimal() +
+  labs(title = "Mean-Shift Clustering on MDS Coordinates",
+       x = "Dimension 1", y = "Dimension 2")
+```
+
+## Short-files analysis with GMM
+
+```{r}
+library(mclust)
+
+D <- short_distance_data_walk3_cos[[1]]
+
+coords <- cmdscale(as.dist(D), k = 2)
+
+# Step 2: Apply Gaussian Mixture Model clustering
+gmm_model <- Mclust(coords)
+
+# Step 3: Extract cluster assignments
+clusters <- as.factor(gmm_model$classification)
+
+# Step 4: Plot
+df_plot <- data.frame(
+  Dim1 = coords[,1],
+  Dim2 = coords[,2],
+  Cluster = clusters
+)
+
+ggplot(df_plot, aes(x = Dim1, y = Dim2, color = Cluster)) +
+  geom_point(size = 3) +
+  theme_minimal() +
+  labs(title = "GMM Clustering from Dissimilarity Matrix",
+       x = "Dimension 1", y = "Dimension 2")
+```
+

@@ -1,0 +1,73 @@
+### Importing libraries
+
+```{r, message=F, warning=F}
+library(tidyverse)
+library(patchwork)
+```
+
+We will now try to find the right way to use the Fourier spectrum, in order to see if there is strong periodicity, and to extract periods during which there is one periodic movement. 
+
+```{r}
+start_idx <- 271601 #Stair
+stop_idx <- 276317 #Stair
+start_idx <- 754311 #Walk
+stop_idx <- 774562 #Walk
+
+df_part_trim %>% filter(idx >= start_idx & idx <= stop_idx) %>% ggplot(aes(x = time)) + 
+  geom_line(aes(y = Y_diff))
+```
+
+
+Here we add the stair indices to show that it is a good way of extracting where we have true periodic movements
+
+```{r}
+temp <- df_part_trim %>% mutate(stairs = 0)
+for(movement in list(stairs_down_idx_1, stairs_down_idx_2, stairs_down_idx_3, stairs_down_idx_4, stairs_down_idx_5, stairs_down_idx_6, stairs_down_idx_7, stairs_down_idx_8)){
+  temp$stairs[movement[1]:movement[2]] <- 1
+}
+for(movement in list(stairs_up_idx_1, stairs_up_idx_2, stairs_up_idx_3, stairs_up_idx_4, stairs_up_idx_5, stairs_up_idx_6, stairs_up_idx_7, stairs_up_idx_8)){
+  temp$stairs[movement[1]:movement[2]] <- 2
+}
+```
+
+```{r}
+periodicity_values <- abs_periodicity_calculator(df_part_trim, 11, start_idx, stop_idx, 18, 5)
+
+temp %>% filter(idx >= start_idx & idx <= stop_idx) %>% ggplot(aes(x = time)) +
+  geom_line(aes(y = periodicity_values), colour = "black") +
+  geom_line(aes(y = ifelse(stairs == 1, 0.05, 0)), colour = "green") +
+  geom_line(aes(y = ifelse(stairs == 2, 0.05, 0)), colour = "red")
+
+
+```
+
+```{r}
+periodicity_values <- c()
+
+start_idx <- 271601 
+stop_idx <- 276317
+col_num <- 2
+wdw_len <- 18
+wdw_ma <- 5
+
+for(j in start_idx:stop_idx) {
+  window <- ma(df[(j - wdw_len - (wdw_ma-1)/2):(j + wdw_len + (wdw_ma-1)/2), col_num],wdw_ma)
+  window <- window[((wdw_ma+1)/2):(2*wdw_len + (wdw_ma+1)/2)]
+  spectrum <- window %>% fft() %>% Mod()
+  spectrum <- spectrum[2:(2*wdw_len+1)] #Excluding DC component here already works a lot easier with indices
+  spectrum_idx <- spectrum %>% order(decreasing = T)
+  periodicity <- (spectrum[spectrum_idx][1:2]^2 %>% sum()) / (spectrum[spectrum_idx][3:(2*wdw_len)]^2 %>% sum())
+  
+  periodicity_values <- append(periodicity_values, periodicity)
+}
+
+j <- 1500000
+j <- 6200000
+wdw_len <- 4000
+window <- ma(df[(j - wdw_len - (wdw_ma-1)/2):(j + wdw_len + (wdw_ma-1)/2), col_num],wdw_ma)
+window <- window[((wdw_ma+1)/2):(2*wdw_len + (wdw_ma+1)/2)]
+acf(window)
+plot(window, type = "h")
+```
+
+

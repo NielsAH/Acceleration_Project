@@ -1,0 +1,107 @@
+### Importing libraries
+
+```{r, message=F, warning=F}
+library(tidyverse)
+```
+
+```{r}
+df_part_old <- activity_partition_to_df(df, 16, 1801, 13, 0.075)
+
+unique(df_part_trim_old$activity_partition)
+
+df_part_trim_old <- trim_activity_partition_3(df_part_old, 1801, 13, 17) 
+
+df_part_trim_old_2 <- trim_activity_partition_2(df_part_old, 1801, 13, 17, 0.075)
+
+df_part_trim_old_3 <- trim_activity_partition_4(df_part_old, 1801, 13, 17)
+```
+
+We first add labels for the 157 periods we get with a threshold of $0.075$.
+
+```{r}
+df_part_trim_old[["activity_lab_part"]] <- "inactive"
+df_part_trim_old_2[["activity_lab_part"]] <- "inactive"
+df_part_trim_old_3[["activity_lab_part"]] <- "inactive"
+
+assign_label <- function(value) {
+  if (value %in% c(8, 12, 13, 28, 33, 35, 103, 111, 131, 132, 133, 134)) {
+    "walk"
+  } else if (value %in% c(16, 66, 67, 73, 74, 83, 86)) {
+    "cycle"
+  } else if (value %in% c(59)) {
+    "comb_run_walk_misc"
+  } else if (value %in% c()) {
+    "stairs"
+  } else if (value %in% c(135, 136, 137)) {
+    "squat"
+  } else if (value %in% c(139, 141)) {
+    "pull_up"
+  } else if (value %in% c(147, 148)) {
+    "calf_raise"
+  } else if (value %in% c(7)) {
+    "comb_walk_stair"
+  } else if (value %in% c(6, 26, 68, 97, 151, 37, 105, 150)) {
+    "comb_walk_cycle_misc"
+  } else if (value %in% c(142)) {
+    "comb_pull_misc"  
+  } else if (value %in% c(138)) {
+    "comb_squat_pull_misc"
+  } else if (value %in% c(9, 14, 15, 27, 29, 30, 34, 98, 99, 104, 155, 157)) {
+    "misc_walk"
+  } else if (value %in% c(1, 23, 24, 55, 61, 75, 78, 79, 95, 117, 118, 129, 152)) {
+    "misc_like_noise"
+  } else if (value != 0) {
+    "misc_like_walk"
+  } else {
+    "inactive"
+  }
+}
+
+df_sand_label <- df_part_trim_old %>%
+  mutate(activity_lab_part = sapply(activity_partition, assign_label))
+
+df_sand_label_2 <- df_part_trim_old_2 %>%
+  mutate(activity_lab_part = sapply(activity_partition, assign_label))
+
+df_sand_label_3 <- df_part_trim_old_3 %>%
+  mutate(activity_lab_part = sapply(activity_partition, assign_label))
+```
+
+Maybe checking now how different/similar these two are when trimmed in different ways. Although that is already sandbox material in a sense.
+
+```{r}
+length(which(df_sand_label_2[[18]] != df_sand_label[[18]]))
+length(df_sand_label_2[[18]])
+#Difference of 40 seconds in labelling activity on average?
+```
+
+Some more checks to see which makes sense to keep for now. Because I thought of the labels using the old trim, not the new trim. I guess that can ruin some things. Although it is good to have both.
+
+```{r}
+#start_time <- as.POSIXct("2024-10-16 08:15:00.000")
+#end_time <- as.POSIXct("2024-10-16 08:15:50.000")
+#Argument for why not to use the first one (can be improved)
+
+#start_time <- as.POSIXct("2024-10-16 08:22:06.000")
+#end_time <- as.POSIXct("2024-10-16 08:22:09.000")
+#Argument for why not to use the third one
+
+start_time <- as.POSIXct("2024-10-16 08:42:12.000")
+end_time <- as.POSIXct("2024-10-16 08:42:13.000")
+
+df_sand_label %>% filter(start_time <= time & end_time > time) %>% ggplot(aes(x = time)) + 
+  geom_line(aes(y = ifelse(activity_partition == 0, 0, 0.5)), colour = "red") +
+  geom_line(aes(y = vec_diff))
+
+df_sand_label_2 %>% filter(start_time <= time & end_time > time) %>% ggplot(aes(x = time)) +
+  geom_line(aes(y = ifelse(activity_partition == 0, 0, 0.5)), colour = "red") +
+  geom_line(aes(y = vec_diff))
+
+df_sand_label_3 %>% filter(start_time <= time & end_time > time) %>% ggplot(aes(x = time)) +
+  geom_line(aes(y = ifelse(activity_partition == 0, 0, 0.5)), colour = "red") +
+  geom_line(aes(y = vec_diff))
+```
+
+```{r}
+
+```

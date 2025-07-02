@@ -1,0 +1,458 @@
+### Importing libraries
+We first import the libraries we need.
+
+```{r, message=F, warning=F}
+#Data analysis
+library(tidyverse)
+library(patchwork)
+library(scales)
+library(RColorBrewer)
+
+#Working with the activity class and data files
+library(lubridate)
+library(read.gt3x)
+library(PhysicalActivity)
+
+#Solving equations
+library(nleqslv)
+library(pracma)
+library(latex2exp)
+```
+
+### Section 2.1
+
+### Section 2.2
+
+```{r}
+#Magenta: #CC79A7
+
+#Rich green: #009E73
+#Bright green #2CA02C
+#Lime green: #8AC926
+
+#Yellow: #FFCC33
+#Warm orange: #E69F00
+#Rich orange: #D55E00
+#Bright red: #E41A1C 
+
+#Rich blue: #377EB8
+#Light blue: #56B4E9
+
+#Good combination primary:
+# #56B4E9
+# #D62728
+# #FFCC33
+
+#Good combination secondary:
+# #984EA3
+# #009E73
+# #E69F00 
+```
+
+```{r}
+start_time <- as.POSIXct("2024-10-10 14:29:00.000")
+end_time <- as.POSIXct("2024-10-10 14:29:08.330")
+
+plot <- filter(A20_off, time >= start_time & time < end_time) %>% 
+  ggplot(aes(x = 1:250)) +
+  geom_line(aes(y = X*9.80665, color = "Direction 1"), linewidth = 0.5) +
+  geom_line(aes(y = Y*9.80665, color = "Direction 2"), linewidth = 0.5) +
+  geom_line(aes(y = Z*9.80665, color = "Direction 3"), linewidth = 0.5) +
+  scale_color_manual(
+    name = "",
+    values = c("Direction 1" = "#56B4E9", "Direction 2" = "#D62728", "Direction 3" = "#FFCC33")
+  ) +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )') #Stopped working???
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+ggsave("data_example_wide_dir.png", plot, width = 10, height = 4, dpi = 300)
+
+plot <- filter(A20_off, time >= start_time & time < end_time) %>% 
+  ggplot(aes(x = 1:250)) +
+  geom_line(aes(y = X*9.80665, color = "Direction 1"), linewidth = 0.5) +
+  geom_line(aes(y = Y*9.80665, color = "Direction 2"), linewidth = 0.5) +
+  geom_line(aes(y = Z*9.80665, color = "Direction 3"), linewidth = 0.5) +
+  geom_point(aes(y = X*9.80665, color = "Direction 1"), size = 1) +
+  geom_point(aes(y = Y*9.80665, color = "Direction 2"), size = 1) +
+  geom_point(aes(y = Z*9.80665, color = "Direction 3"), size = 1) +
+  scale_color_manual(
+    name = "",
+    values = c("Direction 1" = "#56B4E9", "Direction 2" = "#D62728", "Direction 3" = "#FFCC33")
+  ) +
+  labs(
+    x = "Index",
+    y = expression("Acceleration in" ~ m/s^2)
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+ggsave("data_example_incl_points.png", plot, width = 10, height = 4, dpi = 300)
+```
+
+```{r}
+filter(A20_off, time >= start_time & time < end_time)[100,]$X*9.80665
+filter(A20_off, time >= start_time & time < end_time)[100,]$Y*9.80665
+filter(A20_off, time >= start_time & time < end_time)[100,]$Z*9.80665
+```
+
+```{r}
+df_trunc <- filter(A20_off, time >= start_time & time < end_time)
+df_trunc$X <- ma_trunc(df_trunc$X, n = 5)
+df_trunc$Y <- ma_trunc(df_trunc$Y, n = 5)
+df_trunc$Z <- ma_trunc(df_trunc$Z, n = 5)
+```
+
+### Now the moving average versions
+
+```{r}
+plot <- filter(A20_off, time >= start_time & time < end_time) %>% 
+  ggplot(aes(x = 1:250)) +
+  geom_line(aes(y = ma_trunc(X*9.80665, n = 25), color = "Direction 1"), linewidth = 0.5) +
+  geom_line(aes(y = ma_trunc(Y*9.80665, n = 25), color = "Direction 2"), linewidth = 0.5) +
+  geom_line(aes(y = ma_trunc(Z*9.80665, n = 25), color = "Direction 3"), linewidth = 0.5) +
+  scale_color_manual(
+    name = "",
+    values = c("Direction 1" = "#56B4E9", "Direction 2" = "#D62728", "Direction 3" = "#FFCC33")
+  ) +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )')
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+ggsave("trunc_n25.png", plot, width = 10, height = 4, dpi = 300)
+```
+
+### Fourier/spectral analysis
+
+```{r}
+n = 120
+df <- tibble(time = 0:(n-1)) %>%
+  mutate(sin = 1*sin(time*pi/20) + 2*cos(time*pi/20) + 4*sin(time*pi/12))
+
+plot <- ggplot(df, aes(x = time, y = sin)) + geom_point(colour = "#56B4E9") +
+  labs(
+    x = "Time index",
+    y = "Value"
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),    
+    legend.title = element_text(size = 14)    
+  )
+
+ggsave("DFT1.png", plot, width = 10, height = 4, dpi = 300)
+
+df$abs <- fft(df$sin) %>% Mod()
+df$re <- fft(df$sin) %>% Re()
+df$im <- fft(df$sin) %>% Im()
+
+plot <- ggplot(df, aes(x = time, xend = time, y = 0, yend = abs)) + geom_segment(size = 1.5, colour = "#56B4E9") +
+  labs(
+    x = "Fourier component",
+    y = "Value"
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),     
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+
+ggsave("DFT_mod.png", plot, width = 10, height = 4, dpi = 300)
+
+
+
+df$im[4]
+df$im[6]
+
+df$abs[6]
+df$abs[4]
+df$abs[116]
+df$abs[118]
+```
+
+```{r}
+n = 120
+df <- tibble(time = 0:(n-1)) %>%
+  mutate(sin = 1*sin(time*pi/20) + 2*cos(time*pi/20) + 4*sin(time*pi/12))
+df_precise <- tibble(time = seq(from = 0, to = 119, by = 0.02)) %>%
+  mutate(sin = 1*sin(time*pi/20) + 2*cos(time*pi/20) + 4*sin(time*pi/12))
+df_precise <- df_precise %>% mutate(sin_alt = 1*sin(time*pi/(-60/117)) + 2*cos(time*pi/(60/117)) + 4*sin(time*pi/(-60/115)))
+
+plot <- ggplot() + 
+  geom_line(data = df_precise, aes(x = time, y = sin, color = "Low frequency fit"), linewidth = 2) +
+  geom_line(data = df_precise, aes(x = time, y = sin_alt, color = "High frequency fit"), linewidth = 0.08) +
+  geom_point(data = df, aes(x = time, y  = sin, color = "Discrete time series"), size = 2.5) +
+  scale_color_manual(
+    name = "",
+    values = c("Discrete time series" = "#56B4E9", "Low frequency fit" = "#D62728", "High frequency fit" = "#FFCC33")
+  ) +
+  labs(
+    x = "Time index",
+    y = "Value"
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),    
+    legend.title = element_text(size = 14)    
+  )
+
+ggsave("DFT_low_high.png", plot, width = 10, height = 4, dpi = 300)
+
+plot2 <- ggplot() + 
+  geom_line(data = df_precise, aes(x = time, y = sin_alt, color = "High frequency fit"), linewidth = 1) +
+  geom_point(data = df, aes(x = time, y  = sin, color = "Discrete time series"), size = 2) +
+  scale_color_manual(
+    name = "",
+    values = c("Discrete time series" = "#56B4E9", "High frequency fit" = "#FFCC33")
+  ) +
+  labs(
+    x = "Time index",
+    y = "Value"
+  ) +
+  xlim(0, 25) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),    
+    legend.title = element_text(size = 14)    
+  )
+
+ggsave("DFT_high_zoomed.png", plot2, width = 10, height = 4, dpi = 300)
+```
+
+Now we apply the ideas of scaling the Fourier transform to the original data.
+
+```{r}
+start_time <- as.POSIXct("2024-10-10 14:29:00.000")
+end_time <- as.POSIXct("2024-10-10 14:29:08.330")
+
+plot <- filter(A20_off, time >= start_time & time < end_time) %>% 
+  ggplot(aes(x = 1:250)) +
+  geom_point(aes(y = Y*9.80665), color = "#D62728", size = 2) +
+  geom_line(aes(y = Y*9.80665), color = "red", linewidth = 0.5) +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )')
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+ggsave("data_vert.png", plot, width = 10, height = 4, dpi = 300)
+
+df <- filter(A20_off, time >= start_time & time < end_time) 
+spec <- df$Y %>% fft() %>% Mod()
+spec <- c(spec[2:125], spec[126])^2
+spec_df <- data.frame(comp = 1:125, val = spec)
+spec_df$val <- spec_df$val/sum(spec_df$val)
+
+plot2 <- ggplot(spec_df, aes(x = comp, xend = comp, y = 0, yend = val)) + geom_segment(linewidth = 1, colour = "#D62728") +
+  labs(
+    x = "Fourier component",
+    y = TeX(r'( Fraction of (mean $0$) variance explained )')
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),     
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+ggsave("data_vert_spec.png", plot2, width = 10, height = 4, dpi = 300)
+
+#For fraction of variance explained:
+order <- spec_df$val %>% order(decreasing = "T")
+spec_df$val[order[1:50]] %>% sum()
+```
+
+Now see what happens if we only build from part of the Fourier spectrum
+
+```{r}
+fourier_approx_first_half_even <- function(spectrum, t, num_comp){
+  
+  N <- length(spectrum)
+  
+  indices <- (c(Mod(spectrum)[2:(N/2)]*2, Mod(spectrum[N/2 + 1])) %>% order(decreasing = T))[1:num_comp]
+
+  approx_spectrum <- numeric(N)
+  approx_spectrum[indices] <- spectrum[indices + 1]
+  
+  real <- Re(approx_spectrum)
+  imag <- Im(approx_spectrum)
+  
+  value <- 0
+  
+  for(k in 1:(N/2)){
+    value <- value + real[k]*cos(2*pi*k*(t-1)/N) - imag[k]*sin(2*pi*k*(t-1)/N)
+  } 
+  
+  return((2*value + Re(spectrum[1]))/N)
+}
+
+inverse_fourier_approx_old <- function(spectrum, t, num_comp){
+  
+  N <- length(spectrum)
+  
+  indices <- (Mod(spectrum) %>% order(decreasing = T))[1:num_comp]
+  approx_spectrum <- numeric(N)
+  approx_spectrum[indices] <- spectrum[indices]
+  
+  real <- Re(approx_spectrum)
+  imag <- Im(approx_spectrum)
+  
+  value <- 0
+  
+  for(k in 0:(N-1)){
+    value <- value + real[k+1]*cos(2*pi*k*(t-1)/N) - imag[k+1]*sin(2*pi*k*(t-1)/N)
+  }  
+  
+  return(value/N)
+}
+```
+
+```{r}
+df <- filter(A20_off, time >= start_time & time < end_time) 
+spec <- (df$Y*9.80665) %>% fft()
+plot(Re(spec), type = 'h')
+
+df_spec <- data.frame(row = seq(1,250, by = 0.1))
+df_spec$freq_1 <- fourier_approx_first_half_even(spec, seq(1, 250, by = 0.1), 1)
+df_spec$freq_2 <- fourier_approx_first_half_even(spec, seq(1, 250, by = 0.1), 2)
+df_spec$freq_3 <- fourier_approx_first_half_even(spec, seq(1, 250, by = 0.1), 3)
+df_spec$freq_5 <- fourier_approx_first_half_even(spec, seq(1, 250, by = 0.1), 5)
+df_spec$freq_10 <- fourier_approx_first_half_even(spec, seq(1, 250, by = 0.1), 10)
+df_spec$freq_20 <- fourier_approx_first_half_even(spec, seq(1, 250, by = 0.1), 20)
+df_spec$freq_50 <- fourier_approx_first_half_even(spec, seq(1, 250, by = 0.1), 50)
+df_spec$freq_125 <- fourier_approx_first_half_even(spec, seq(1, 250, by = 0.1), 125)
+
+plot125 <-  ggplot() +
+  geom_line(data = df, aes(x = 1:250, y = Y*9.80665, color = "Direction 2"), linewidth = 1, alpha = 0.3) +
+  geom_line(data = df_spec, aes(x = row, y = df_spec$freq_125, color = "Reconstruction"), linewidth = 1) +
+  scale_color_manual(
+    name = "",
+    values = c("Direction 2" = "#D62728", "Reconstruction" = "#56B4E9")
+  ) +
+  labs(
+    x = "Index",
+    y = TeX(r'( Acceleration in $m/s^2$ )')
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)
+  )
+ggsave("reconstruction1.png", plot1, width = 10, height = 4, dpi = 300)
+ggsave("reconstruction2.png", plot2, width = 10, height = 4, dpi = 300)
+ggsave("reconstruction3.png", plot3, width = 10, height = 4, dpi = 300)
+ggsave("reconstruction5.png", plot5, width = 10, height = 4, dpi = 300)
+ggsave("reconstruction10.png", plot10, width = 10, height = 4, dpi = 300)
+ggsave("reconstruction20.png", plot20, width = 10, height = 4, dpi = 300)
+ggsave("reconstruction50.png", plot50, width = 10, height = 4, dpi = 300)
+ggsave("reconstruction125.png", plot125, width = 10, height = 4, dpi = 300)
+```
+
+## Example autocovariance instead of energy
+
+```{r}
+val_list <- c()
+for(j in -1000:1000){
+  if(abs(j) <= 2){
+    val_list <- append(val_list, 0)
+  } 
+  else if(((abs(j) %% 8) == 3) | ((abs(j) %% 8) == 5)){
+    val_list <- append(val_list, sign(j))
+  }
+    else if(((abs(j) %% 8) == 1) | ((abs(j) %% 8) == 7)){
+    val_list <- append(val_list, sign(-j))
+    }
+      else if(((abs(j) %% 8) == 4)){
+    val_list <- append(val_list, 2*sign(j))
+      }
+        else if(((abs(j) %% 8) == 0)){
+    val_list <- append(val_list, 2*sign(-j))
+        }
+      else if(((abs(j) %% 8) == 2) | ((abs(j) %% 8) == 6)){
+    val_list <- append(val_list, 0)
+    }
+}
+
+df <- data.frame(val = val_list, idx = -1000:1000)
+
+df %>% 
+  ggplot(aes(x = idx)) +
+  geom_point(aes(y = val), color = "#D62728", size = 2) +
+  geom_line(aes(y = val), color = "red", linewidth = 0.5) +
+  labs(
+    x = "Index",
+    y = "Value"
+  ) +
+  xlim(-30, 30) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+acf(val_list)
+```
+
+Testing
+
+```{r}
+n = 120
+df <- tibble(time = 0:(n-1)) %>%
+  mutate(sin = 1*sin(time*pi/20) + 2*cos(time*pi/20) + 4*sin(time*pi/12))
+temp <- fft(df$sin)
+input <- seq(1, 120, by = 0.01)
+input <- 1:120
+fourier_approx_first_half_even(temp, input, 4) %>% plot(type = 'l')
+inverse_fourier_approx_old(temp, input, 4) %>% plot(type = 'l')
+```
+

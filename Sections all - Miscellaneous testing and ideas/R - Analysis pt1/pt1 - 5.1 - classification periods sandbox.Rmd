@@ -1,0 +1,123 @@
+```{r}
+library(tidyverse)
+```
+
+We will first try to attempt what distinguishes the different movements. To start, we focus on getting out walking and classifying all walking periods. We need different ways to classify them, to ensure they still hold when we get a new data set.
+
+### Mean and standard deviation
+
+We first start with some basic variables that might be used to distinguish different movements.
+
+```{r}
+column_names <- c("activity", "activity_length", "X_mean", "X_sd", "Y_mean", "Y_sd", "Z_mean", "Z_sd", "X_diff_mean", "X_diff_sd", "Y_diff_mean", "Y_diff_sd", "Z_diff_mean", "Z_diff_sd")
+
+df_activities <- data.frame(matrix(ncol = length(column_names), nrow = 0))
+colnames(df_activities) <- column_names
+
+df_activities <- add_activity_information(df_activities, walk_idx, "walk")
+df_activities <- add_activity_information(df_activities, run_idx, "run")
+df_activities <- add_activity_information(df_activities, cycle_idx, "cycle")
+df_activities <- add_activity_information(df_activities, stairs_up_idx, "stairs_up")
+df_activities <- add_activity_information(df_activities, stairs_down_idx, "stairs_down")
+df_activities <- add_activity_information(df_activities, car_idx, "car")
+df_activities <- add_activity_information(df_activities, noise_active_idx, "noise_active")
+df_activities <- add_activity_information(df_activities, misc_active_idx, "misc_active")
+df_activities <- add_activity_information(df_activities, stand_active_idx, "stand_active")
+df_activities <- add_activity_information(df_activities, inactive_seated_idx, "inact_seated")
+df_activities <- add_activity_information(df_activities, inactive_off_idx, "inact_off")
+df_activities <- add_activity_information(df_activities, inactive_standing_idx, "inact_stand")
+```
+
+Now make sure it sees the right columns as numerical:
+
+```{r}
+for(j in 2:ncol(df_activities)){
+  df_activities[,j] <- as.numeric(df_activities[,j])
+}
+```
+
+Visualisation:
+
+```{r}
+df_activities %>%
+  filter(activity %in% c("walk", "stairs_up", "stairs_down", "cycle")) %>%
+  ggplot() + 
+  geom_point(aes(x = Y_sd, y = Z_sd, colour = activity))
+
+```
+
+```{r}
+df_activities_small <- df_activities[c(1:9, 11:28),]
+pca_result <- prcomp(df_activities_small[-1], center = T, scale = T)
+pca_df <- data.frame(
+  PC1 = pca_result$x[, 1],
+  PC2 = pca_result$x[, 2],
+  Class = df_activities_small$activity)
+  
+ggplot(pca_df, aes(x = PC1, y = PC2, color = Class)) +
+  geom_point(size = 3) +
+  labs(title = "PCA Plot", x = "PC1", y = "PC2") +
+  theme_minimal()
+#PCA not ideal for this, as it will not consider the labels and/or try to combinate variables to make these differences clearer
+```
+
+
+### Energy and correlation
+
+Specifically we are interested in the correlation between axes. Both are explained in the paper about this.
+
+Test for correlation:
+```{r}
+temp_Y <- activity_summary(df_part_trim, walk_idx_9, 3, identity)
+temp_Z <- activity_summary(df_part_trim, walk_idx_9, 4, identity)
+(cov(temp_Z, temp_Y, use = "complete")) / (sd(temp_Z)*sd(temp_Y))
+
+temp_Y <- activity_summary(df_part_trim, stairs_down_idx_7, 3, identity)
+temp_Z <- activity_summary(df_part_trim, stairs_down_idx_7, 4, identity)
+(cov(temp_Z, temp_Y, use = "complete")) / (sd(temp_Z)*sd(temp_Y))
+```
+
+Test for energy:
+```{r}
+temp_Y <- activity_summary(df_part_trim, inactive_standing_idx_3, 3, identity)
+length(temp_Y)
+spectrum <- Mod(fft(temp_Y))
+sum(spectrum^2)/length(spectrum)^2
+
+```
+
+### Fourier analysis
+
+```{r}
+start_idx <- walk_idx[[1]][1]
+stop_idx <- walk_idx[[1]][2]
+subj <- df_part_trim[start_idx:stop_idx,]
+subj <- subj[1:5000,]
+
+spectrum <- fft(subj$X)
+spectrum_magnitude <- Mod(spectrum)
+plot(spectrum_magnitude, type = 'h', main = 'Frequency Spectrum', xlab = 'Frequency', ylab = 'Magnitude')
+
+spectrum <- fft(subj$Y)
+spectrum_magnitude <- Mod(spectrum)
+plot(spectrum_magnitude, type = 'h', main = 'Frequency Spectrum', xlab = 'Frequency', ylab = 'Magnitude')
+
+spectrum <- fft(subj$Z)
+spectrum_magnitude <- Mod(spectrum)
+plot(spectrum_magnitude, type = 'h', main = 'Frequency Spectrum', xlab = 'Frequency', ylab = 'Magnitude')
+```
+
+```{r}
+top_50_indices <- order(spectrum_magnitude, decreasing = TRUE)[1:50]
+top_50_values <- spectrum_magnitude[top_50_indices]
+top_50_indices
+top_50_values
+```
+
+```{r}
+acf(subj$X, lag.max = 100)
+```
+
+```{r}
+
+```

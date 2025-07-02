@@ -1,0 +1,13 @@
+### Importing libraries
+
+```{r, message=F, warning=F}
+library(tidyverse)
+```
+
+### Using Fourier transform
+```{r}
+
+```
+
+
+

@@ -1,0 +1,38 @@
+### Importing libraries
+
+```{r, message=F, warning=F}
+library(tidyverse)
+library(patchwork)
+library(seewave)
+```
+
+Trying out STFT
+```{r}
+fs <- 1000
+t <- seq(0, 1, by = 1/fs)  # Time vector
+signal <- sin(2 * pi * 50 * t) + sin(2 * pi * 120 * t)  # Signal with two frequencies
+
+fs <- 1000  # Sampling frequency (Hz)
+t <- seq(0, 2, by = 1/fs)  # Time vector from 0 to 2 seconds
+signal <- ifelse(t < 1, sin(2 * pi * 50 * t), sin(2 * pi * 50 * t) + sin(2 * pi * 120 * t))
+
+# Compute and plot the STFT (spectrogram)
+spectro(signal, f = fs, wl = 256, ovlp = 75, collevels = seq(-50, 0, 10))
+```
+
+
+```{r}
+start_idx <- 908100
+stop_idx <- 909350
+temp <- df_part_trim[start_idx:stop_idx,3] %>% scale()
+
+spectro(temp, f = 30, wl = 100, ovlp = 75, collevels = seq(-15, 0, 5))
+```
+
+```{r}
+start_idx <- 6406469
+stop_idx <- 6700000
+temp <- df_part_trim[start_idx:stop_idx,2] %>% scale()
+
+spectro(temp, f = 30, wl = 94, ovlp = 75, collevels = seq(-15, 0, 5))
+```

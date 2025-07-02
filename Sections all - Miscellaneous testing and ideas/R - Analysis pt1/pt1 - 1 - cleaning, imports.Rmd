@@ -1,0 +1,112 @@
+```{r, message=F, warning=F}
+library(tidyverse)
+#remotes::install_github("THLfi/read.gt3x")
+#install.packages("lubridate")
+#install.packages("PhysicalActivity)
+library(lubridate)
+library(read.gt3x)
+library(PhysicalActivity)
+```
+
+### Importing data
+```{r}
+raw_1 <- read.gt3x("Data3/1 (2024-10-16).gt3x")
+raw_2 <- read.gt3x("Data6/Martin (2024-11-27).gt3x")
+raw_test <- read.gt3x("Data3/6611237 (2023-06-07).gt3x")
+#raw_1_actilife <- read.csv("Data4/1 (2024-10-16)RAW.csv", skip = 10)
+#According to online information, ActiLife already makes some steps to reduce noise to the raw data, but this does not seem the case (in any case, not public how they would do this). Check still.
+epoch_1 <- readActigraph("Data5/1 (2024-10-16)1sec.agd", convertTime = TRUE)
+```
+
+### Investiging data
+
+```{r}
+attributes(raw_1)$header
+attributes(raw_1)[setdiff(names(attributes(raw_1)), c("dim", "dimnames", "time_index"))] #2070 missing values, which has been verified when comparing with the epoch file. We instead just ignore everything happening after 13:00:00 
+```
+
+We convert the raw data to a data frame, and change the time zone for both files. It thinks the observations are in GMT, but they are not (has been checked).
+
+```{r}
+df_1 <- as.data.frame(raw_1)
+df_1$time <- force_tz(df_1$time, tzone = "Europe/Berlin")
+df_1 <- df_1[df_1$time < as.POSIXct("2024-10-16 13:00:00.000"), ]
+
+epoch_1$TimeStamp <- force_tz(epoch_1$TimeStamp, tzone = "Europe/Berlin")
+epoch_1 <- epoch_1[epoch_1$TimeStamp < as.POSIXct("2024-10-16 13:00:00.000"),]
+```
+
+We will now add labels for the inclinometer and steps.
+
+```{r}
+epoch_column_to_df <- function(df, col_name, epoch_df, col_num){
+  
+  df[[col_name]] <- 0
+  attribute_list <- list()
+  
+  for(j in 1:nrow(epoch_df)){
+    attribute <- epoch_df[j,col_num]
+    attribute_list[[j]] <- rep(attribute, 30)
+  }
+  
+  df[[col_name]] <- unlist(attribute_list)
+  
+  return(df)
+}
+```
+
+```{r}
+df <- epoch_column_to_df(df_1, "steps", epoch_1, 5)
+df <- epoch_column_to_df(df, "incline_off", epoch_1, 7)
+df <- epoch_column_to_df(df, "incline_stand", epoch_1, 8)
+df <- epoch_column_to_df(df, "incline_sit", epoch_1, 9)
+df <- epoch_column_to_df(df, "incline_lie", epoch_1, 10)
+```
+
+```{r}
+#Computes differences for a single column and adds to dataframe
+add_diff_to_df <- function(df, col_name, col_num) {
+  df[[col_name]] <- c(diff(df[,col_num]), NA) 
+  return(df)
+}
+
+#Computes norm of several columns and adds to dataframe
+add_vec_to_df <- function(df, col_name, col_nums) {
+  df[[col_name]] <- sqrt(rowSums(df[,col_nums]^2))
+  return(df)
+}
+
+#Computes moving average of a list/vector
+ma <- function(x, n){stats::filter(x, rep(1/n, n), sides = 2)}
+
+#Adds the moving average to a column to a dataframe
+add_ma_to_df <- function(df, col_name, col_num, n) {
+  df[[col_name]] <- ma(df[col_num], n)
+  return(df)
+}
+```
+
+```{r}
+df <- add_diff_to_df(df, "X_diff", 2)
+df <- add_diff_to_df(df, "Y_diff", 3)
+df <- add_diff_to_df(df, "Z_diff", 4)
+
+df <- add_vec_to_df(df, "vec_diff", c(10,11,12))
+
+df <- add_ma_to_df(df, "ma_diff_181", 13, 181) #The ultimate goal: at least 6 seconds of activity
+
+df <- add_ma_to_df(df, "ma_diff_601", 13, 601) #At least 20 seconds of activity
+
+df <- add_ma_to_df(df, "ma_diff_1801", 13, 1801) #At least a minute of activity
+
+#Removing cols
+#df$ma_diff_181 <- NULL
+#df$ma_diff_601 <- NULL
+#df$ma_diff_1801 <- NULL
+```
+
+
+
+
+
+

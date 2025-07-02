@@ -1,0 +1,146 @@
+```{r message=F, warning=F}
+library(tidyverse)
+```
+
+We will try to distinguish two time series, where the time index will need to be used as part of the prediction. We explore possibilities to do so, to apply this later to our activity periods.
+
+We can make this as hard as we want, by e.g. adding more noise and taking sin(t) instead of sin(t/5) to muddy the time-dependence. 
+
+```{r}
+n = 157
+df <- tibble(time = 1:n) %>%
+  mutate(sin1 = sin(time/5) + rnorm(n, sd = 0.1)) %>%
+  mutate(sin2 = sin(time/5) + rnorm(n, sd = 0.1)) %>%
+  mutate(sin3 = sin(time/5) + rnorm(n, sd = 0.1)) %>%
+  mutate(unif1 = sin(runif(n, 0, 2*pi)) + rnorm(n, sd = 0.1)) %>%
+  mutate(unif2 = sin(runif(n, 0, 2*pi)) + rnorm(n, sd = 0.1)) %>%
+  mutate(unif3 = sin(runif(n, 0, 2*pi)) + rnorm(n, sd = 0.1))  
+```
+
+```{r}
+df %>% 
+  ggplot(aes(x = time)) +
+  geom_line(aes(y = sin1), colour = "blue") +
+  #geom_line(aes(y = sin2)) +
+  #geom_line(aes(y = sin3)) +
+  #geom_line(aes(y = unif3)) +
+  #geom_line(aes(y = unif2)) +
+  geom_line(aes(y = unif1), colour = "red")
+  
+```
+### Fourier analysis
+
+```{r}
+spectrum <- fft(df$sin3)
+spectrum_magnitude <- Mod(spectrum)
+plot(spectrum_magnitude, type = 'h', main = 'Frequency Spectrum', xlab = 'Frequency', ylab = 'Magnitude')
+
+spectrum_magnitude_2 <- Mod(fft(df$unif2))
+plot(spectrum_magnitude_2, type = 'h', main = 'Frequency Spectrum', xlab = 'Frequency', ylab = 'Magnitude')
+```
+
+### LSTM RNN
+
+```{r}
+library(keras)
+library(tensorflow)
+
+#devtools::install_github("rstudio/tensorflow")
+#devtools::install_github("rstudio/keras")
+
+#tensorflow::install_tensorflow()
+#tensorflow::tf_config()
+```
+
+Note: way more data is probably needed for RNN. Also, if different lengths of activity probably need to pad to 0(!)
+*Experiment with this!!! How to actually use LSTM RNN? + Understand what is going on* 
+
+--- new attempt LSTM from scratch --- 
+Seems Tensorflow en Keras work now.
+It is a many-to-one problem / sequence classification. 
+
+
+
+```{r}
+
+```
+
+--- genai, skip below for now ---
+
+```{r}
+###09-10-2024
+
+# Your time series data: each list is a separate sequence
+asin1 <- sin(seq(0, 10, length.out = 230)) + rnorm(230, sd = 0.1)  # Example sinusoid data
+asin2 <- sin(seq(0, 8, length.out = 225)) + rnorm(225, sd = 0.1)
+asin3 <- sin(seq(0, 12, length.out = 220)) + rnorm(220, sd = 0.1)
+
+aunif1 <- sin(runif(230, 0, 10)) + rnorm(230, sd = 0.1)  # Example random data
+aunif2 <- sin(runif(225, 0, 8)) + rnorm(225, sd = 0.1)
+aunif3 <- sin(runif(220, 0, 12)) + rnorm(220, sd = 0.1)
+
+# Pad sequences to the maximum length
+max_len <- max(sapply(list(asin1, asin2, asin3, aunif1, aunif2, aunif3), length))
+
+pad_sequence <- function(seq, max_len) {
+  c(seq, rep(0, max_len - length(seq)))
+}
+
+# Apply padding to each sequence
+padded_data <- lapply(list(asin1, asin2, asin3, aunif1, aunif2, aunif3), pad_sequence, max_len = max_len)
+
+# Create the final dataset
+x_train <- array(unlist(padded_data), dim = c(length(padded_data), max_len, 1))
+y_train <- c(1, 1, 1, 0, 0, 0)  # Labels: 1 for sinusoid, 0 for uniform
+
+# Normalize the data
+x_train <- scale(x_train)
+
+# Convert labels to categorical
+y_train <- to_categorical(y_train, num_classes = 2)
+#Error in (function (x, num_classes = NULL)  : unused arguments (y = c(1, 1, 1, 0, 0, 0), dtype = "float32")
+
+# Define the LSTM model
+model <- keras_model_sequential() %>%
+  layer_lstm(units = 10, input_shape = c(max_len, 1)) %>%
+  layer_dense(units = 2, activation = 'softmax')
+#Python module tensorflow.keras was not found!!! Fix!!!
+
+# Compile the model
+model %>% compile(
+  optimizer = 'adam',
+  loss = 'categorical_crossentropy',
+  metrics = 'accuracy'
+)
+
+# Train the model
+model %>% fit(x_train, y_train, epochs = 20, batch_size = 2)
+
+# The model is now trained on the six instances, you can now use it to make predictions on new data
+
+```
+
+---SKip below for now---
+
+```{r}
+#x_train: sinusoid/random data
+#y_train: labels
+#test: new sequence that it should predict correctly
+
+# Preprocess your time series data for LSTM
+data <- scale(test) # Normalize the data
+x_train <- array(data, dim = c(length(data), 1, 1)) # Reshape to (samples, time steps, features)
+
+model <- keras_model_sequential() %>%
+  layer_lstm(units = 50, input_shape = c(1, 1)) %>%
+  layer_dense(units = 1, activation = 'sigmoid')
+
+model %>% compile(
+  optimizer = 'adam',
+  loss = 'binary_crossentropy',
+  metrics = 'accuracy'
+)
+
+# Fit the model
+model %>% fit(x_train, y_train, epochs = 20, batch_size = 32)
+```

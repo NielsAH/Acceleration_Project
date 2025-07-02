@@ -1,0 +1,210 @@
+```{r, message=F, warning=F}
+#Data analysis
+library(tidyverse)
+library(latex2exp)
+library(patchwork)
+library(scales)
+library(RColorBrewer)
+
+#Working with the activity class and data files
+library(lubridate)
+library(read.gt3x)
+library(PhysicalActivity)
+
+#Solving equations
+library(nleqslv)
+library(pracma)
+library(latex2exp)
+
+#Reshaping / data manipulation
+library(reshape2)
+library(data.table)
+library(zeallot)
+
+##gganimate/creating animations
+library(gganimate)
+library(glue)
+library(shiny)
+library(av)
+library(magick)
+```
+
+##Analysis of walking test 1, using X/Y/Z example
+
+```{r}
+param_default <- list(df_walk_1, 150, 1, 9, ma_gauss,
+                    0.75, 0.1, 0.001, 0.25,
+                    5, 60, 
+                    5, 3, 0.1, 
+                    0.1, 0.3, 1)
+
+c(df, wdw_size, ma_data, ma_energy, kernel_func, 
+     upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, 
+     min_step_period, max_step_period, 
+     period_len, period_len_double, period_thresh, 
+     double_step_thresh, thresh_direction, std_dev) %<-% param_default
+```
+
+```{r}
+unordered_data <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+#as.POSIXct("2025-01-20 10:31:19.372") #Start of walking video
+data <- Glue_and_classify(unordered_data, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+```
+
+```{r}
+current_mvm <- 1
+
+test_mvm <- data[[current_mvm]]
+test_data <- test_mvm$data
+
+start_current_mvm <- test_data$time[1] %>% as.numeric()
+
+if(current_mvm > 1){
+  end_last_run <- data[[current_mvm - 1]]$data$time[1] %>% as.numeric()
+} else{
+  end_last_mvm <- as.numeric(df$time[1]) - 1/30
+}
+
+times_to_check <- c()
+for(k in 1:50){
+  if(start_current_mvm - k/30 > end_last_mvm + 0.01){ #0.01 just to make sure with rounding and such
+    new_start <- start_current_mvm - k/30
+    times_to_check <- append(times_to_check, new_start)
+  }
+}
+times_to_check <- rev(times_to_check)
+
+data_to_check <- filter(df, time >= times_to_check[1] & time <= times_to_check[length(times_to_check)])
+differences_to_check <- abs(diff(data_to_check$X)) + abs(diff(data_to_check$Y)) + abs(diff(data_to_check$Z))
+idx_to_start <- which.min(differences_to_check) 
+
+time_to_start <- times_to_check[idx_to_start]
+time_to_stop <- test_data$time[length(test_data$time)] %>% as.numeric()
+
+data_to_analyse <- filter(df, time >= time_to_start & time <= time_to_stop)
+added_idc <- 1 + length(times_to_check) - idx_to_start
+
+if(added_idc + nrow(test_data) == nrow(data_to_analyse)){
+  print("Correct")
+}else{
+  print("Mistake")
+}
+
+#Now see if the physical part works
+data_to_analyse_new <- data_to_analyse
+
+rest_x <- mean(data_to_analyse$X)
+rest_y <- mean(data_to_analyse$Y)
+rest_z <- mean(data_to_analyse$Z)
+rest_vec <- c(rest_x, rest_y, rest_z)
+rot_mat <- rotation_initial(c(rest_x, rest_y, rest_z))[[1]]
+data_to_analyse_new[, 2:4] <- t(rot_mat %*% t(data_to_analyse[, 2:4]))
+data_to_analyse_new$Y <- data_to_analyse_new$Y - mean(data_to_analyse_new$Y)
+
+x_acc <- data_to_analyse_new$X
+z_acc <- data_to_analyse_new$Z
+acc_matrix <- cbind(x_acc, z_acc)
+cov_matrix <- cov(acc_matrix)
+eig <- eigen(cov_matrix)
+forward_vector <- eig$vectors[, 1]
+
+angle_rad <- atan2(abs(forward_vector[2]), abs(forward_vector[1]))
+rotation_matrix <- matrix(c(cos(angle_rad), -sin(angle_rad), 
+                            sin(angle_rad), cos(angle_rad)), nrow = 2)
+rotated_acc <- acc_matrix %*% t(rotation_matrix)
+    
+data_to_analyse_new$X <- rotated_acc[, 2]
+data_to_analyse_new$Z <- rotated_acc[, 1]
+
+plot(cumsum(data_to_analyse_new$Y*9.80665/30), type = 'l')
+```
+
+## Analysis of treadmill data, using existing vert/fw/side example
+
+```{r}
+#start_time <- as.POSIXct("2025-04-08 11:14:23.335") #Start time tread2 video
+df_tread2 <- N_video %>% filter(time > as.POSIXct("2025-04-08 11:08:33.800") & time < as.POSIXct("2025-04-08 11:14:41.335"))
+
+param_default <- list(df_tread2, 150, 1, 9, ma_gauss,
+                    0.75, 0.1, 0.001, 0.25,
+                    5, 60, 
+                    5, 3, 0.1, 
+                    0.1, 0.3, 1)
+
+c(df, wdw_size, ma_data, ma_energy, kernel_func, 
+     upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, 
+     min_step_period, max_step_period, 
+     period_len, period_len_double, period_thresh, 
+     double_step_thresh, thresh_direction, std_dev) %<-% param_default
+```
+
+```{r}
+unordered_data <- fast_extraction_algorithm(df, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+#as.POSIXct("2025-04-08 11:09:23.800") #Start of treadmill video
+data <- Glue_and_classify(unordered_data, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+```
+
+Analysis of (part of the) 18km/u part, using existing vert/fw/side
+
+```{r}
+correction_fw_18_tread2 <- 5.596
+data_18km <- data[[3]]$data %>% filter(time > as.POSIXct("2025-04-08 11:09:29.000") & time < as.POSIXct("2025-04-08 11:09:59.000"))
+data_18km %>% nrow()
+
+(cumsum(data_18km$acc_fw*9.80665/30) + correction_fw_18_tread2) %>% plot(type = 'l')
+(cumsum(data_18km$acc_side*9.80665/30)) %>% plot(type = 'l')
+(cumsum(data_18km$acc_vert*9.80665/30) - 0.18) %>% plot(type = 'l')
+#Vert being most accurate seems to imply it is partly that position accelerometer changes a bit
+
+correction_fw_12_tread2 <- 3.33
+data_12km <- data[[4]]$data %>% filter(time > as.POSIXct("2025-04-08 11:10:19.000") & time < as.POSIXct("2025-04-08 11:11:49.000"))
+#Three different orientations clearly visible, because "average" is used to compute angles
+(cumsum(data_12km$acc_fw*9.80665/30) + correction_fw_12_tread2) %>% plot(type = 'l')
+(cumsum(data_12km$acc_side*9.80665/30)) %>% plot(type = 'l')
+(cumsum(data_12km$acc_vert*9.80665/30)) %>% plot(type = 'l')
+
+#When we zoom in on one of the orientations:
+df_12km_orient1 <- N_video %>% filter(time > as.POSIXct("2025-04-08 11:10:18.000") & time < as.POSIXct("2025-04-08 11:10:40.000"))
+unordered_data <- fast_extraction_algorithm(df_12km_orient1, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+#as.POSIXct("2025-04-08 11:09:23.800") #Start of treadmill video
+data <- Glue_and_classify(unordered_data, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+correction_fw_12_orient1 <- 2.537
+data_12km_orient1 <- data[[1]]$data
+(cumsum(data_12km_orient1$acc_fw*9.80665/30) + correction_fw_12_orient1) %>% plot(type = 'l')
+(cumsum(data_12km_orient1$acc_side*9.80665/30)) %>% plot(type = 'l')
+(cumsum(data_12km_orient1$acc_vert*9.80665/30)) %>% plot(type = 'l')
+
+#Lastly we do one of the orientations for 10km/u
+df_10km_orient1 <- N_video %>% filter(time > as.POSIXct("2025-04-08 11:11:58.000") & time < as.POSIXct("2025-04-08 11:12:20.000"))
+unordered_data <- fast_extraction_algorithm(df_10km_orient1, wdw_size, ma_data, ma_energy, kernel_func, upright_thresh, abs_acc_thresh, thresh_abs, thresh_rel, min_step_period, max_step_period, period_len, period_len_double, period_thresh, double_step_thresh, thresh_direction, sigma = std_dev)
+#as.POSIXct("2025-04-08 11:09:23.800") #Start of treadmill video
+data <- Glue_and_classify(unordered_data, 3, 3, 150, 150, 150, T, 20, 5, ma_gauss, sigma = 1)
+correction_fw_6_orient1 <- 1.873
+data_6km_orient1 <- data[[1]]$data
+(cumsum(data_6km_orient1$acc_fw*9.80665/30) + correction_fw_6_orient1) %>% plot(type = 'l')
+(cumsum(data_6km_orient1$acc_side*9.80665/30)) %>% plot(type = 'l')
+(cumsum(data_6km_orient1$acc_vert*9.80665/30)) %>% plot(type = 'l')
+```
+
+```{r}
+temp <- data.frame(Y = cumsum(data_6km_orient1$acc_vert*9.80665/30))
+
+plot <- temp %>% 
+  ggplot(aes(x = 1:639)) +
+  geom_line(aes(y = Y*9.80665), color = "#984EA3", linewidth = 0.5) +
+  labs(
+    x = "Index",
+    y = "Estimated vertical velocity in m/s"
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(size = 14),            
+    axis.title = element_text(size = 14),      
+    axis.text = element_text(size = 14),       
+    legend.text = element_text(size = 14),     
+    legend.title = element_text(size = 14)     
+  )
+
+ggsave("vertical_problem.png", plot, width = 10, height = 4, dpi = 300)
+```
+

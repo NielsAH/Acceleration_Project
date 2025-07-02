@@ -1,0 +1,215 @@
+### Importing libraries
+
+```{r, message=F, warning=F}
+library(tidyverse)
+```
+
+```{r}
+df_part_trim <- df_part_trim %>% mutate(idx = 1:nrow(df_part_trim))
+```
+
+Pipeline is establishing start period roughly myself, then writing function to again take largest difference between moving average on left and moving average on right within that period (could maybe even use old function). Or just by hand, as there is not one perfect way to do it anyway. 
+
+```{r}
+#Filtering by time
+start_time <- as.POSIXct("2024-10-10 14:26:00.000")
+end_time <- as.POSIXct("2024-10-10 14:34:00.000")
+
+df_part_trim %>% filter(time >= start_time & time <= end_time) %>% ggplot(aes(x = time)) + 
+  geom_line(aes(y = Y)) + 
+  geom_line(aes(y = ifelse(activity_partition == 0, 0, 0.5)), colour = "red") 
+
+df_part_trim %>% filter(time >= start_time & time <= end_time) %>% pull(activity_partition) %>% min()
+df_part_trim %>% filter(time >= start_time & time <= end_time) %>% pull(idx) %>% min()
+
+#Filtering by partition element
+part_element <- 54
+
+df_part_trim %>% filter(activity_partition == part_element) %>% ggplot(aes(x = time)) + 
+  geom_line(aes(y = vec_diff)) + 
+  geom_line(aes(y = ifelse(activity_partition == 0, 0, 0.5)), colour = "red") 
+
+df_part_trim %>% filter(activity_partition == part_element) %>% pull(time) %>% min()
+df_part_trim %>% filter(activity_partition == part_element) %>% pull(time) %>% max()
+df_part_trim %>% filter(activity_partition == part_element) %>% pull(idx) %>% min()
+df_part_trim %>% filter(activity_partition == part_element) %>% pull(idx) %>% max()
+
+
+#Filtering by index
+start_idx <- 305000 
+stop_idx <- 315000
+
+df_part_trim %>% filter(idx >= start_idx & idx <= stop_idx) %>% ggplot(aes(x = time)) + 
+  geom_line(aes(y = Z)) + 
+  geom_line(aes(y = ifelse(activity_partition == 0, 0, 0.5)), colour = "red") 
+
+df_part_trim %>% filter(idx >= start_idx & idx <= stop_idx) %>% pull(time) %>% min()
+df_part_trim %>% filter(idx >= start_idx & idx <= stop_idx) %>% pull(time) %>% max()
+df_part_trim %>% filter(idx >= start_idx & idx <= stop_idx) %>% pull(idx) %>% min()
+```
+
+```{r}
+view(df_part_trim %>% filter(time >= start_time & time <= end_time))
+
+view(df_part_trim[5644150:5695381,])
+```
+
+Storing running. _How to deal with fact that it is not a full active period? The activity detection becomes a bit obsolete if we do it by hand anyway. Or ma-left and ma-right for different statistics, and if difference still very big at some point then we have had some activity switch. For now just store the relevant indices_
+
+```{r}
+run_idx_1 <- c(5644150, 5695381) #Curated, part of partition element 354
+
+#Combine
+run_idx <- list(run_idx_1)
+
+#run_idc[[1]][1]:run_idc[[1]][2]
+```
+
+
+Storing walking (walking definite, walking with possible noise, stops and short stairs such as to and from tram and train).
+
+```{r}
+walk_idx_1 <- c(894364, 909318) #Partition element 58
+walk_idx_2 <- c(910255, 927158) #Partition element 59
+walk_idx_3 <- c(252389, 271561) #Curated, part of partition element 30
+walk_idx_4 <- c(387121, 407109) #Partition element 41, could be small pauses
+walk_idx_5 <- c(11109981, 11112687) #Partition element 602
+walk_idx_6 <- c(11112922, 11124060) #Partition element 603
+walk_idx_7 <- c(11563331, 11578797) #Partition element 659
+walk_idx_8 <- c(754311, 774526) #Partition element 54, but contains stairs at the end
+walk_idx_9 <- c(751498, 753932)  #Partition element 53
+walk_idx_10 <- c(910801, 925201) #Walk Apeldoorn roughly
+
+#Combine
+walk_idx <- list(walk_idx_1, walk_idx_2, walk_idx_3, walk_idx_4, walk_idx_5, walk_idx_6, walk_idx_7, walk_idx_8, walk_idx_9)
+```
+
+Storing stairs going up
+
+```{r}
+#All curated and part of partition element 30
+#To be sure we only took stairs, we sometimes cut one possible part of the movement at the edges. We also did not include the platform in the middle
+#Also: made sure to be full periods, so not from peak to valley. All in Z axis
+stairs_up_idx_1 <- c(271601, 271803) 
+stairs_up_idx_2 <- c(271881, 272058)
+stairs_up_idx_3 <- c(272791, 273016)
+stairs_up_idx_4 <- c(273095, 273308)
+stairs_up_idx_5 <- c(273973, 274160)
+stairs_up_idx_6 <- c(274251, 274524)
+stairs_up_idx_7 <- c(275169, 275415)
+stairs_up_idx_8 <- c(275524, 275721)
+
+#Curated, part of partition element ...
+
+
+#Combine
+stairs_up_idx <- list(stairs_up_idx_1, stairs_up_idx_2, stairs_up_idx_3, stairs_up_idx_4, stairs_up_idx_5, stairs_up_idx_6, stairs_up_idx_7, stairs_up_idx_8)
+```
+
+Storing stairs going down
+
+```{r}
+#All curated and part of partition element 30
+#To be sure we only took stairs, we sometimes cut one possible part of the movement at the edges. We also did not include the platform in the middle
+#Also: made sure to be full periods, so not from peak to valley. All in Y axis
+stairs_down_idx_1 <- c(272234, 272446)
+stairs_down_idx_2 <- c(272503, 272724)
+stairs_down_idx_3 <- c(273402, 273616)
+stairs_down_idx_4 <- c(273696, 273883)
+stairs_down_idx_5 <- c(274576, 274807)
+stairs_down_idx_6 <- c(274904, 275095)
+stairs_down_idx_7 <- c(275802, 276028)
+stairs_down_idx_8 <- c(276129, 276317)
+
+stairs_down_idx <- list(stairs_down_idx_1, stairs_down_idx_2, stairs_down_idx_3, stairs_down_idx_4, stairs_down_idx_5, stairs_down_idx_6, stairs_down_idx_7, stairs_down_idx_8)
+```
+
+Storing cycling
+
+```{r}
+#Most quite loosely curated to be sure I was on the bike
+cycle_idx_1 <- c(210601, 216241) #Curated, part of partition element 28
+cycle_idx_2 <- c(1019701, 1024201) #Curated, part of partition element 67
+cycle_idx_3 <- c(2857801, 2862301) #Curated, part of partition element 127
+cycle_idx_4 <- c(3556801, 3562201) #Curated, part of partition element 176
+cycle_idx_5 <- c(5828701, 5898601) #Curated, part of partition element 389
+cycle_idx_6 <- c(5900401, 5908501) #Curated, part of partition element 390
+cycle_idx_7 <- c(6398240, 6406169) #Partition element 428. Contains getting on/stopping
+cycle_idx_8 <- c(6406469, 6420091) #Partition element 429. Contains getting on/stopping
+cycle_idx_9 <- c(6420435, 6429355) #Partition element 430. Contains getting on/stopping
+cycle_idx_10 <- c(6436351, 6471301) #Curated, part of partition element 431
+
+cycle_idx <- list(cycle_idx_1, cycle_idx_2, cycle_idx_3, cycle_idx_4, cycle_idx_5, cycle_idx_6, cycle_idx_7, cycle_idx_8, cycle_idx_9, cycle_idx_10)
+```
+
+```{r}
+inactive_seated_idx_1 <- c(5976001, 6030001) #Chess match
+inactive_seated_idx_2 <- c(6192001, 6246001) #Chess match
+inactive_seated_idx_3 <- c(1467001, 1566001) #Studying at desk
+inactive_seated_idx_4 <- c(2997001, 3303001) #Studying at desk behind reception
+inactive_seated_idx_5 <- c(547201, 741601) #Lecture at VU
+inactive_seated_idx_6 <- c(2880001, 2928601) #In train
+inactive_seated_idx_7 <- c(3456001, 3483001) #In bus
+
+inactive_seated_idx <- list(inactive_seated_idx_1, inactive_seated_idx_2, inactive_seated_idx_3, inactive_seated_idx_4, inactive_seated_idx_5, inactive_seated_idx_6, inactive_seated_idx_7)
+```
+
+```{r}
+car_idx_1 <- c(3928501, 3956401)
+car_idx_2 <- c(4172401, 4208401)
+
+car_idx <- list(car_idx_1, car_idx_2)
+```
+
+```{r}
+inactive_off_idx_1 <- c(1584001, 2808001)
+inactive_off_idx_2 <- c(4374001, 5607001)
+inactive_off_idx_3 <- c(6831001, 8118001)
+inactive_off_idx_4 <- c(9099001, 10710001)
+inactive_off_idx_5 <- c(12078001, 13284001)
+inactive_off_idx_6 <- c(14661001, 15687001)
+
+inactive_off_idx <- list(inactive_off_idx_1, inactive_off_idx_2, inactive_off_idx_3, inactive_off_idx_4, inactive_off_idx_5, inactive_off_idx_6)
+```
+
+```{r}
+inactive_standing_idx_1 <- c(286201, 297001) #Train station
+inactive_standing_idx_2 <- c(228601, 246601) #In train
+inactive_standing_idx_3 <- c(11124151, 11125051) #Tram station
+inactive_standing_idx_4 <- c(10748401, 10751701) #Train station
+
+inactive_standing_idx <- list(inactive_standing_idx_1, inactive_standing_idx_2, inactive_standing_idx_3, inactive_standing_idx_4)
+```
+
+```{r}
+#E.g. putting on, just making some random movements to see what happens, etc. "Random" or "noisy" in some sense, can be very different and different positions as well
+noise_active_idx_1 <- c(83821, 84061) #Putting on accelerometer
+noise_active_idx_2 <- c()  #Was wrong, removed
+noise_active_idx_3 <- c() #Was wrong, removed
+
+noise_active_idx <- list(noise_active_idx_1, noise_active_idx_2, noise_active_idx_3)
+```
+
+```{r}
+#Activity done while standing, such as cooking, dishes etc., but without really walking
+stand_active_idx_1 <- c(6420435, 6429355) #Doing dishes. Check!
+stand_active_idx_2 <- c(144001, 153001) #Part morning routine
+stand_active_idx_3 <- c(15825901, 15827701) #Somewhat active in gym, but no exercises. Maybe standing around, racking some weights
+stand_active_idx_4 <- c()
+stand_active_idx_5 <- c()
+
+stand_active_idx <- list(stand_active_idx_1, stand_active_idx_2, stand_active_idx_3)
+```
+
+```{r}
+misc_active_idx_1 <- c(15864601, 15865801) #Incline bench press
+
+misc_active_idx <- list(misc_active_idx_1)
+```
+
+Later add e.g. pull-up, squat, calf raise, more types of walking and stairs. Also squatting/reaching/vacuuming, both dishwashing and shave+brush routine, jumping.
+Movements still missing do on Wednesday. 
+
+```{r}
+
+```

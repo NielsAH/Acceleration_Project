@@ -1,0 +1,98 @@
+### Importing libraries
+
+```{r, message=F, warning=F}
+library(tidyverse)
+library(patchwork)
+```
+
+We will now try to find the right way to use the Fourier spectrum, in order to see if there is strong periodicity, and to extract periods during which there is one periodic movement. 
+
+```{r}
+start_idx <- 271601 #Stair
+stop_idx <- 276317 #Stair
+start_idx <- 754311 #Walk
+stop_idx <- 774562 #Walk
+
+df_part_trim %>% filter(idx >= start_idx & idx <= stop_idx) %>% ggplot(aes(x = time)) + 
+  geom_line(aes(y = Y_diff))
+```
+
+
+Here we add the stair indices to show that it is a good way of extracting where we have true periodic movements
+
+```{r}
+temp <- df_part_trim %>% mutate(stairs = 0)
+for(movement in list(stairs_down_idx_1, stairs_down_idx_2, stairs_down_idx_3, stairs_down_idx_4, stairs_down_idx_5, stairs_down_idx_6, stairs_down_idx_7, stairs_down_idx_8)){
+  temp$stairs[movement[1]:movement[2]] <- 1
+}
+for(movement in list(stairs_up_idx_1, stairs_up_idx_2, stairs_up_idx_3, stairs_up_idx_4, stairs_up_idx_5, stairs_up_idx_6, stairs_up_idx_7, stairs_up_idx_8)){
+  temp$stairs[movement[1]:movement[2]] <- 2
+}
+```
+
+```{r}
+periodicity_values <- periodicity_calculator(df_part_trim, 3, start_idx, stop_idx, 18, 5)
+
+temp %>% filter(idx >= start_idx & idx <= stop_idx) %>% ggplot(aes(x = time)) +
+  geom_line(aes(y = periodicity_values), colour = "black") +
+  geom_line(aes(y = ifelse(stairs == 1, 0.27, 0)), colour = "green") +
+  geom_line(aes(y = ifelse(stairs == 2, 0.27, 0)), colour = "red")
+```
+
+Below, we test what a good metric is for periodicity: the peak or the value compared to other values
+
+```{r}
+wdw_len <- 18
+wdw_ma <- 5
+
+#Trying out with one index instead of loop/function
+j <- 3940200 #car 1
+j <- 3942000 #car 2
+j <- 760000 #walk 1
+j <- 259000 #walk 2
+j <- 271700 #stairs up 1
+j <- 2861000 #Cycle 1
+j <- 150000 #Stand active 1
+j <- 83920 #Noise active 1
+
+j <- 274000 #Stairs middle test for how long period is
+
+window <- ma(df_part_trim[(j - wdw_len - (wdw_ma-1)/2):(j + wdw_len + (wdw_ma-1)/2), 11],wdw_ma)
+window <- window[((wdw_ma+1)/2):(2*wdw_len + (wdw_ma+1)/2)]
+spectrum <- window %>% fft() %>% Mod()
+spectrum <- spectrum[2:(2*wdw_len+1)] #Excluding DC component here already works a lot easier with indices
+
+spectrum_idx <- spectrum %>% order(decreasing = T)
+periodicity <- (spectrum[spectrum_idx][1:2]^2 %>% sum()) / (spectrum[spectrum_idx][3:(2*wdw_len)]^2 %>% sum())
+periodicity 
+
+(periodicity_alt <- max(spectrum)/(length(spectrum)))
+```
+
+Problem with periodicity_alt, is that same periodicity can have higher peaks if values are higher
+
+```{r}
+n <- 800
+temp <- sin((1:n)*pi/10)
+
+temp_spec <- temp %>% fft() %>% Mod()
+temp_spec <- temp_spec[2:n]
+temp_idx <- spectrum %>% order(decreasing = T)
+periodicity <- (temp_spec[temp_idx][1:2]^2 %>% sum()) / (temp_spec[temp_idx][3:(2*wdw_len)]^2 %>% sum())
+periodicity 
+(periodicity_alt <- max(temp_spec)/(length(temp_spec)))
+
+n <- 800
+temp <- 20*sin((1:n)*pi/10)
+temp_spec <- temp %>% fft() %>% Mod()
+temp_spec <- temp_spec[2:n]
+temp_idx <- temp_spec %>% order(decreasing = T)
+periodicity <- (temp_spec[temp_idx][1:2]^2 %>% sum()) / (temp_spec[temp_idx][3:(n-1)]^2 %>% sum())
+periodicity 
+(periodicity_alt <- max(temp_spec)/(length(temp_spec)))
+```
+
+To be aware of:
+-We want consistent results for X, Y, Z
+-We want consistent results when taking different window length
+-We probably do want to smooth / take moving average

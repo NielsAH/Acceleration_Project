@@ -1,0 +1,117 @@
+### Importing libraries
+
+```{r, message=F, warning=F}
+library(tidyverse)
+library(patchwork)
+```
+
+Sample periodic signal
+```{r}
+temp <- sin(1:1000)+sin((1:1000)/4)+sin((1:1000)/10)+sin(2*(1:1000))
+plot(Mod(fft(temp)), type = "h")
+```
+
+Sample shifted periodic signal
+```{r}
+temp <- c(sin(1:10), c(0,0,0), sin(1:24), c(0,0), sin(1:18), c(0,0,0,0,0,0), sin(1:5), c(0,0), sin(1:41), c(0,0), sin(1:61), c(0,0,0,0)) 
+plot(Mod(fft(temp)), type = "h")
+```
+
+Situation 1: interruption/noise, but still underlying signal that continues. So noise is multiple of 20
+Situation 2: no underlying signal, noise has different length
+
+```{r}
+noise_length <- 0
+temp <- c(sin((1:100)*pi/10), rep(0, noise_length), sin((1:100)*pi/10)) 
+plot(temp, type = "l")
+Mod(fft(temp)) %>% order(decreasing = T)
+Mod(fft(temp)) %>% max()
+Mod(fft(temp)) %>% plot(type = "h")
+```
+
+Situation 1: picks up underlying signal. Highest fourier component will be around 100 no matter length noise, which would correspond to length of function where this is the periodicity being 200 (?)
+Situation 2: no longer true. The peak is still for a period of 20, but it is lower, especially if the noise length is close to half a period. However, if the noise length is long, the peak gets close to 100 again. 
+
+Now situation 3: noise can have different lengths, but the signal now picks up at a different moment
+```{r}
+noise_length <- 0
+temp <- c(sin((1:100)*pi/10), rep(0, noise_length), sin(pi + (1:100)*pi/10)) 
+plot(temp, type = "l")
+Mod(fft(temp)) %>% order(decreasing = T)
+Mod(fft(temp)) %>% max()
+Mod(fft(temp)) %>% plot(type = "h")
+```
+
+Test: how does the Fourier transform deal with signals that have clear periodicity, but do not look like a sinusoid
+
+```{r}
+temp <- rep(c(1,2,2,4,6,6,7,3,4,6, 3, 4, 3, 2, -1, -2, 1, 2, -2, 0), 20)
+plot(temp, type = "h")
+Mod(fft(temp)) %>% order(decreasing = T)
+Mod(fft(temp)) %>% max()
+Mod(fft(temp)) %>% plot(type = "h")
+```
+
+### The reverse Fourier transform
+
+```{r}
+temp <- df[(car_idx_1[1]+1000):(car_idx_1[1]+1199),11] 
+temp <- df[(cycle_idx_1[1]+1000):(cycle_idx_1[1]+1199),11] 
+plot(temp, type = "l")
+
+temp_spectrum <- fft(temp)
+plot(Mod(temp_spectrum)[2:length(temp_spectrum)], type = "h")
+temp_spectrum
+inverse_fourier(temp_spectrum, 1:length(temp)) %>% plot(type = "l")
+
+sum(Mod(temp_spectrum))
+
+temp_approx <- inverse_fourier_approx(temp_spectrum, 1:length(temp), 7)
+temp_approx
+temp_approx %>% plot(type = "l")
+```
+
+### Trying and understanding what spectrum looks like with smoothed data
+
+```{r}
+temp <- df[(walk_idx_1[1]+1000):(walk_idx_1[1]+1199),3] 
+temp <- ma(temp, n = 1)
+plot(temp, type = "l")
+temp <- temp[!is.na(temp)]
+
+temp_spectrum <- fft(temp)
+plot(Mod(temp_spectrum)[2:length(temp_spectrum)], type = "h")
+
+temp_approx <- inverse_fourier_approx(temp_spectrum, 1:length(temp), 3)
+plot(temp, type = "l")
+lines(temp_approx, type = "l", col = "red")
+
+
+temp <- df[(car_idx_1[1]+1000):(car_idx_1[1]+1199),3] 
+temp <- ma(temp, n = 1)
+plot(temp, type = "l")
+temp <- temp[!is.na(temp)]
+
+temp_spectrum <- fft(temp)
+plot(Mod(temp_spectrum)[2:length(temp_spectrum)], type = "h")
+
+temp_approx <- inverse_fourier_approx(temp_spectrum, 1:length(temp), 9)
+plot(temp, type = "l")
+lines(temp_approx, type = "l", col = "red")
+```
+
+### Trying and understanding what spectrum looks like with tricky data
+
+```{r}
+noise_length <- 8
+temp <- c(sin((1:100)*pi/10), rep(0, noise_length), sin((1:100)*pi/10), rep(0, noise_length), sin((1:100)*pi/10), rep(0, noise_length), sin((1:100)*pi/10), rep(0, noise_length), sin((1:100)*pi/10)) 
+plot(temp, type = 'l')
+
+temp_spectrum<- fft(temp)
+order(Mod(temp_spectrum), decreasing = T)
+temp_spectrum %>% Mod() %>% plot(type = 'h') 
+
+temp_approx <- inverse_fourier_approx(temp_spectrum, 1:length(temp), 3)
+plot(temp, type = "l")
+lines(temp_approx, type = "l", col = "red")
+```
