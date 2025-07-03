@@ -2,7 +2,7 @@
 
 ## Information
 This GitHub page is used to share the code and computations to the thesis project on accelerometer data. 
-It also includes example clustering using 4-medoids, using a least squares MDS visualisation into three dimensions for different dissimilariaties, as described in the thesis. These can be found in the Section 5 medoid folder.
+It also includes example clustering using 4-medoids, using a least squares MDS visualisation into three dimensions for different dissimilariaties, as described in the thesis. These can be found in the Section 5.2 full k-medoids clustering folder, and then in the main folder within that.
 All other code is also roughly included by section. However, the files have not been reorganised. Some of the code did not make the thesis, and some of the code for images in the thesis can be at surprising places. 
 Only one data example file is included, other raw data files have been omitted due to privacy concerns and file size (and are not part of this project's history either).
 
