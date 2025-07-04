@@ -7,7 +7,7 @@ All other code is also roughly included by section. However, the files have not 
 Only one data example file is included, other raw data files have been omitted due to privacy concerns and file size (and are not part of this project's history either).
 
 ## Required packages / dependencies
-Several CRAN R packages have been included in this project. They need to be installed for at least some code to work.
+Several R packages (all part of CRAN) have been included in this project. They need to be installed for at least some code to work.
 
 <details>
   <summary>Click to expand packages</summary>
@@ -68,5 +68,5 @@ I welcome anyone to do so for the following reasons.
 - You cannot find any computations mentioned in the thesis that you are interested in.
 - You cannot replicate any computations mentioned in the thesis that you are interested in.
 - You have found a privacy or safety concern within my data.
-- You have questions about the missing data in the code, or other data mentioned in the thesis. We can discuss which data can be shared through consulation with the WKZ/UMC.
+- You have questions about the missing data in the code, or other data mentioned in the thesis. We can discuss which data can be shared after consulation with the WKZ/UMC.
 - You have any other question, remarks or suggestions about the code or thesis.
